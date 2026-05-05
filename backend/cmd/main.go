@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/ayussh-2/config"
+	"github.com/ayussh-2/internal/database"
 	"github.com/ayussh-2/internal/logger"
 	"github.com/ayussh-2/internal/routes"
 	"github.com/gin-gonic/gin"
@@ -22,10 +23,18 @@ func main() {
 
 	log.Info("Starting server", zap.String("env", cfg.Env))
 
+	db,err:=database.NewPostgres(cfg,log)
+	
+	if err != nil{
+		log.Fatal("Cannot connect to DB",zap.Error(err))
+	}
+
+	_ = db
+
 	server := gin.New()
 	server.Use(gin.Logger(), gin.Recovery())
 
-	routes.RegisterRoutes(server, log)
+	routes.RegisterRoutes(server, log,db)
 
 	if err := server.Run(); err != nil {
 		log.Error("Failed to start server", zap.Error(err))

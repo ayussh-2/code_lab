@@ -1,6 +1,9 @@
 package services
 
 import (
+	"net/http"
+
+	"github.com/ayussh-2/internal/utils"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
@@ -15,9 +18,9 @@ func NewHealthService(log *zap.Logger) *HealthService {
 
 func (h *HealthService) HealthCheck(c *gin.Context) {
 	h.log.Info("health check hit")
-	c.JSON(200, gin.H{"status": "ok"})
+	utils.Success(c, http.StatusOK, "service healthy", gin.H{"status": "ok"})
 }
 
 func (h *HealthService) Home(c *gin.Context) {
-	c.JSON(200, gin.H{"msg": "Welcome to something API"})
+	utils.Success(c, http.StatusOK, "welcome", gin.H{"msg": "Welcome to something API"})
 }
