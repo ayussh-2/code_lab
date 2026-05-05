@@ -23,10 +23,10 @@ func main() {
 
 	log.Info("Starting server", zap.String("env", cfg.Env))
 
-	db,err:=database.NewPostgres(cfg,log)
-	
-	if err != nil{
-		log.Fatal("Cannot connect to DB",zap.Error(err))
+	db, err := database.NewPostgres(cfg, log)
+
+	if err != nil {
+		log.Fatal("Cannot connect to DB", zap.Error(err))
 	}
 
 	_ = db
@@ -34,7 +34,7 @@ func main() {
 	server := gin.New()
 	server.Use(gin.Logger(), gin.Recovery())
 
-	routes.RegisterRoutes(server, log,db)
+	routes.RegisterRoutes(server, log, db, cfg)
 
 	if err := server.Run(); err != nil {
 		log.Error("Failed to start server", zap.Error(err))
