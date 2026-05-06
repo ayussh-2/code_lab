@@ -1,6 +1,8 @@
 package services
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"net/http"
 	"strconv"
@@ -44,6 +46,8 @@ type LoginResult struct {
 	RefreshToken string
 }
 
+
+
 type RefreshResult struct {
 	Response     RefreshResponse
 	RefreshToken string
@@ -54,6 +58,13 @@ type RegisterUserInput struct {
 	Email    string
 	Password string
 }
+
+type GoogleSignupInput struct {
+	Name  string
+	Email string
+}
+
+
 
 func NewAuthService(log *zap.Logger, db *gorm.DB, cfg *config.Config) *AuthService {
 	return &AuthService{log: log, db: db, cfg: cfg}
@@ -96,18 +107,73 @@ func (a *AuthService) RegisterUser(input RegisterUserInput) (*UserResponse, erro
 	return &resp, nil
 }
 
-func (a *AuthService) Login(input LoginInput) (*LoginResult, error) {
-	var user models.User
-	if err := a.db.Where("email = ?", input.Email).First(&user).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, utils.NewAppError(http.StatusUnauthorized, "invalid credentials", nil)
-		}
-		a.log.Error("failed to fetch user for login", zap.Error(err))
-		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot login", err)
+func (a *AuthService) RegisterGoogleUser(input GoogleSignupInput) (*UserResponse, error) {
+	randomPassword := make([]byte, 24)
+	if _, err := rand.Read(randomPassword); err != nil {
+		a.log.Error("failed to generate random password for google user", zap.Error(err))
+		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot create user", err)
 	}
 
-	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
-		return nil, utils.NewAppError(http.StatusUnauthorized, "invalid credentials", nil)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(base64.RawURLEncoding.EncodeToString(randomPassword)), bcrypt.DefaultCost)
+	if err != nil {
+		a.log.Error("failed to hash password for google user", zap.Error(err))
+		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot create user", err)
+	}
+
+	user := models.User{
+		Name:     input.Name,
+		Email:    input.Email,
+		Password: string(hashedPassword),
+	}
+
+	if err := a.db.Create(&user).Error; err != nil {
+		a.log.Error("failed to create google user", zap.Error(err))
+		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot create user", err)
+	}
+
+	resp := UserResponse{
+		ID:    user.ID,
+		Name:  user.Name,
+		Email: user.Email,
+	}
+
+	return &resp, nil
+}
+
+func (a *AuthService) Login(input LoginInput, callbackEmail string, callbackName string) (*LoginResult, error) {
+	var user models.User
+
+	finalEmail := input.Email
+	if callbackEmail != "" {
+		finalEmail = callbackEmail
+	}
+
+	if err := a.db.Where("email = ?", finalEmail).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			if callbackEmail != "" {
+				if _, registerErr := a.RegisterGoogleUser(GoogleSignupInput{
+					Name:  callbackName,
+					Email: callbackEmail,
+				}); registerErr != nil {
+					return nil, registerErr
+				}
+				if loginAgainErr := a.db.Where("email = ?", finalEmail).First(&user).Error; loginAgainErr != nil {
+					a.log.Error("failed to fetch google user after registration", zap.Error(loginAgainErr))
+					return nil, utils.NewAppError(http.StatusInternalServerError, "cannot login", loginAgainErr)
+				}
+			} else {
+				return nil, utils.NewAppError(http.StatusUnauthorized, "invalid credentials", nil)
+			}
+		} else {
+			a.log.Error("failed to fetch user for login", zap.Error(err))
+			return nil, utils.NewAppError(http.StatusInternalServerError, "cannot login", err)
+		}
+	}
+
+	if callbackEmail == "" {
+		if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(input.Password)); err != nil {
+			return nil, utils.NewAppError(http.StatusUnauthorized, "invalid credentials", nil)
+		}
 	}
 
 	accessToken, err := utils.GenerateAccessToken(a.cfg, user.ID, user.Email)
@@ -140,6 +206,7 @@ func (a *AuthService) Login(input LoginInput) (*LoginResult, error) {
 		RefreshToken: refreshToken,
 	}, nil
 }
+
 
 func (a *AuthService) Refresh(refreshToken string) (*RefreshResult, error) {
 	claims, err := utils.ParseRefreshToken(a.cfg, refreshToken)
@@ -214,3 +281,7 @@ func (a *AuthService) RefreshCookieMaxAgeSeconds() int {
 	}
 	return hours * 3600
 }
+
+
+
+

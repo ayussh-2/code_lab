@@ -1,2 +1,2 @@
 dev-server:
-	cd backend && air
+	clear && cd backend && air
