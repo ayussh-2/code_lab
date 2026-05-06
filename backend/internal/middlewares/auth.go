@@ -34,6 +34,38 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 
 		c.Set("userID", claims.UserID)
 		c.Set("email", claims.Email)
+		c.Set("role", claims.Role)
+		c.Next()
+	}
+}
+
+func RequireRoles(roles ...string) gin.HandlerFunc {
+	allowed := make(map[string]struct{}, len(roles))
+	for _, role := range roles {
+		allowed[role] = struct{}{}
+	}
+
+	return func(c *gin.Context) {
+		roleVal, ok := c.Get("role")
+		if !ok {
+			utils.Fail(c, http.StatusForbidden, "missing role in token")
+			c.Abort()
+			return
+		}
+
+		role, ok := roleVal.(string)
+		if !ok {
+			utils.Fail(c, http.StatusForbidden, "invalid role in token")
+			c.Abort()
+			return
+		}
+
+		if _, exists := allowed[role]; !exists {
+			utils.Fail(c, http.StatusForbidden, "insufficient role permissions")
+			c.Abort()
+			return
+		}
+
 		c.Next()
 	}
 }

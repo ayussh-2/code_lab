@@ -14,6 +14,7 @@ import (
 type AccessClaims struct {
 	UserID uint   `json:"user_id"`
 	Email  string `json:"email"`
+	Role   string `json:"role"`
 	jwt.RegisteredClaims
 }
 
@@ -22,7 +23,7 @@ type RefreshClaims struct {
 	jwt.RegisteredClaims
 }
 
-func GenerateAccessToken(cfg *config.Config, userID uint, email string) (string, error) {
+func GenerateAccessToken(cfg *config.Config, userID uint, email string, role string) (string, error) {
 	minutes, err := strconv.Atoi(cfg.JWTExpiryMinutes)
 	if err != nil {
 		minutes = 15
@@ -32,6 +33,7 @@ func GenerateAccessToken(cfg *config.Config, userID uint, email string) (string,
 	claims := AccessClaims{
 		UserID: userID,
 		Email:  email,
+		Role:   role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    cfg.JWTIssuer,
 			Subject:   strconv.FormatUint(uint64(userID), 10),

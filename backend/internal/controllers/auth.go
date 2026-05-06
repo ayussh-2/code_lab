@@ -104,9 +104,11 @@ func (ac *AuthController) Login(c *gin.Context) {
 func (ac *AuthController) Me(c *gin.Context) {
 	userID, _ := c.Get("userID")
 	email, _ := c.Get("email")
+	role, _ := c.Get("role")
 	utils.Success(c, http.StatusOK, "authenticated user", gin.H{
 		"user_id": userID,
 		"email":   email,
+		"role":    role,
 	})
 }
 

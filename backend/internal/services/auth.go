@@ -25,6 +25,7 @@ type UserResponse struct {
 	ID    uint   `json:"id"`
 	Name  string `json:"name"`
 	Email string `json:"email"`
+	Role  string `json:"role"`
 }
 
 type LoginInput struct {
@@ -74,6 +75,7 @@ func (a *AuthService) RegisterUser(input RegisterUserInput) (*UserResponse, erro
 	user := models.User{
 		Name:  input.Name,
 		Email: input.Email,
+		Role:  "user",
 	}
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(input.Password), bcrypt.DefaultCost)
 	if err != nil {
@@ -102,6 +104,7 @@ func (a *AuthService) RegisterUser(input RegisterUserInput) (*UserResponse, erro
 		ID:    user.ID,
 		Name:  user.Name,
 		Email: user.Email,
+		Role:  user.Role,
 	}
 
 	return &resp, nil
@@ -124,6 +127,7 @@ func (a *AuthService) RegisterGoogleUser(input GoogleSignupInput) (*UserResponse
 		Name:     input.Name,
 		Email:    input.Email,
 		Password: string(hashedPassword),
+		Role:     "user",
 	}
 
 	if err := a.db.Create(&user).Error; err != nil {
@@ -135,6 +139,7 @@ func (a *AuthService) RegisterGoogleUser(input GoogleSignupInput) (*UserResponse
 		ID:    user.ID,
 		Name:  user.Name,
 		Email: user.Email,
+		Role:  user.Role,
 	}
 
 	return &resp, nil
@@ -176,7 +181,7 @@ func (a *AuthService) Login(input LoginInput, callbackEmail string, callbackName
 		}
 	}
 
-	accessToken, err := utils.GenerateAccessToken(a.cfg, user.ID, user.Email)
+	accessToken, err := utils.GenerateAccessToken(a.cfg, user.ID, user.Email, user.Role)
 	if err != nil {
 		a.log.Error("failed to generate access token", zap.Error(err))
 		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot login", err)
@@ -201,6 +206,7 @@ func (a *AuthService) Login(input LoginInput, callbackEmail string, callbackName
 				ID:    user.ID,
 				Name:  user.Name,
 				Email: user.Email,
+				Role:  user.Role,
 			},
 		},
 		RefreshToken: refreshToken,
@@ -230,7 +236,7 @@ func (a *AuthService) Refresh(refreshToken string) (*RefreshResult, error) {
 		return nil, utils.NewAppError(http.StatusUnauthorized, "invalid refresh token", nil)
 	}
 
-	accessToken, err := utils.GenerateAccessToken(a.cfg, user.ID, user.Email)
+	accessToken, err := utils.GenerateAccessToken(a.cfg, user.ID, user.Email, user.Role)
 	if err != nil {
 		a.log.Error("failed to generate access token on refresh", zap.Error(err))
 		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot refresh token", err)
