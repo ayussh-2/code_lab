@@ -1,4 +1,8 @@
 import { apiRequest } from "@/lib/api";
+import {
+    frontendQuestionsAsListItems,
+    getFrontendQuestionBySlug,
+} from "@/lib/frontend-questions";
 
 export interface ProblemListItem {
   id: number;
@@ -29,12 +33,35 @@ export interface ProblemDetail {
   }>;
 }
 
+function matchesSearch(item: ProblemListItem, query: string): boolean {
+  if (!query) return true;
+  const q = query.toLowerCase();
+  return (
+    item.title.toLowerCase().includes(q) ||
+    item.slug.toLowerCase().includes(q) ||
+    item.topics.some((topic) => topic.toLowerCase().includes(q))
+  );
+}
+
 export async function getProblems(searchTerm = "") {
   const query = searchTerm.trim();
   const params = query ? `?search=${encodeURIComponent(query)}` : "";
-  return apiRequest<ProblemListItem[]>(`/problems${params}`);
+  const result = await apiRequest<ProblemListItem[]>(`/problems${params}`);
+
+  const hardcoded = frontendQuestionsAsListItems().filter((item) =>
+    matchesSearch(item, query),
+  );
+
+  return {
+    message: result.message,
+    data: [...hardcoded, ...result.data],
+  };
 }
 
 export async function getProblemBySlug(slug: string) {
+  const hardcoded = getFrontendQuestionBySlug(slug);
+  if (hardcoded) {
+    return { message: "ok", data: hardcoded };
+  }
   return apiRequest<ProblemDetail>(`/problems/${slug}`);
 }

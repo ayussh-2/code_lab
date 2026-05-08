@@ -1,3 +1,20 @@
+export const FRONTEND_PROBLEM_TOPIC = "frontend";
+
+export function isFrontendProblem(topics: string[]): boolean {
+    return topics.some(
+        (topic) => topic.toLowerCase() === FRONTEND_PROBLEM_TOPIC,
+    );
+}
+
+export function getProblemHref(problem: {
+    slug: string;
+    topics: string[];
+}): string {
+    return isFrontendProblem(problem.topics)
+        ? `/problems/frontend/${problem.slug}`
+        : `/problems/${problem.slug}`;
+}
+
 export const PROBLEM_DIFFICULTY_TEXT_CLASS: Record<string, string> = {
     easy: "text-[#1cbf73]",
     medium: "text-[#e8a24a]",

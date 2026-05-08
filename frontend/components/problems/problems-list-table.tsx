@@ -3,7 +3,10 @@ import Link from "next/link";
 import type { ProblemListItem } from "@/lib/problems";
 import { ErrorState, LoadingState } from "@/components/ui/async-state";
 import { Chip } from "@/components/ui/chip";
-import { PROBLEM_DIFFICULTY_TEXT_CLASS } from "./problem-shared";
+import {
+    PROBLEM_DIFFICULTY_TEXT_CLASS,
+    getProblemHref,
+} from "./problem-shared";
 
 interface ProblemsListTableProps {
     problems: ProblemListItem[];
@@ -54,7 +57,7 @@ export function ProblemsListTable({
                     <Link
                         key={problem.id}
                         className="grid grid-cols-[70px_1fr_90px] items-center gap-4 border-b border-white/6 px-6 py-3.5 text-sm last:border-b-0 hover:bg-white/3"
-                        href={`/problems/${problem.slug}`}
+                        href={getProblemHref(problem)}
                     >
                         <div className="text-xs font-mono text-zinc-500">
                             {String(index + 1).padStart(2, "0")}
