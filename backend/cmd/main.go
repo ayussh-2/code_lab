@@ -4,6 +4,7 @@ import (
 	"github.com/ayussh-2/config"
 	"github.com/ayussh-2/internal/database"
 	"github.com/ayussh-2/internal/logger"
+	"github.com/ayussh-2/internal/middlewares"
 	"github.com/ayussh-2/internal/routes"
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -33,6 +34,7 @@ func main() {
 
 	server := gin.New()
 	server.Use(gin.Logger(), gin.Recovery())
+	server.Use(middlewares.CORSMiddleware(cfg.FrontendURL))
 
 	routes.RegisterRoutes(server, log, db, cfg)
 

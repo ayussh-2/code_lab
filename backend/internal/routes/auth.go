@@ -12,14 +12,14 @@ import (
 
 func AuthRoutes(router *gin.RouterGroup, log *zap.Logger, db *gorm.DB, cfg *config.Config) {
 	svc := services.NewAuthService(log, db, cfg)
-	controller := controllers.NewAuthController(log, svc)
+	controller := controllers.NewAuthController(log, svc, cfg.FrontendURL)
 
 	auth := router.Group("/auth")
 	auth.POST("/register", controller.CreateUser)
 	auth.POST("/login", controller.Login)
 	auth.POST("/refresh", controller.Refresh)
-	auth.GET("/google/login",controller.HandleGoogleLogin)
-	auth.GET("/google/callback",controller.HandleGoogleCallback)
+	auth.GET("/google/login", controller.HandleGoogleLogin)
+	auth.GET("/google/callback", controller.HandleGoogleCallback)
 
 	protected := auth.Group("")
 	protected.Use(middlewares.AuthMiddleware(cfg))

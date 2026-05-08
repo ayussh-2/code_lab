@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"net/url"
 
 	"github.com/ayussh-2/config"
 	"github.com/ayussh-2/internal/services"
@@ -18,8 +19,9 @@ import (
 )
 
 type AuthController struct {
-	log *zap.Logger
-	svc *services.AuthService
+	log         *zap.Logger
+	svc         *services.AuthService
+	frontendURL string
 }
 
 type CreateUserRequest struct {
@@ -33,10 +35,11 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required,min=6,max=255"`
 }
 
-func NewAuthController(log *zap.Logger, svc *services.AuthService) *AuthController {
+func NewAuthController(log *zap.Logger, svc *services.AuthService, frontendURL string) *AuthController {
 	return &AuthController{
-		log: log,
-		svc: svc,
+		log:         log,
+		svc:         svc,
+		frontendURL: frontendURL,
 	}
 }
 
@@ -171,30 +174,29 @@ func (ac *AuthController) Logout(c *gin.Context) {
 }
 
 var googleOauthConfig = &oauth2.Config{
-    ClientID:     config.LoadConfig().GoogleClientID,
-    ClientSecret: config.LoadConfig().GoogleClientSecret,
-    RedirectURL:  config.LoadConfig().GoogleRedirectURI,
-    Scopes: []string{
-        "https://www.googleapis.com/auth/userinfo.email",
-        "https://www.googleapis.com/auth/userinfo.profile",
-    },
-    Endpoint: google.Endpoint,
+	ClientID:     config.LoadConfig().GoogleClientID,
+	ClientSecret: config.LoadConfig().GoogleClientSecret,
+	RedirectURL:  config.LoadConfig().GoogleRedirectURI,
+	Scopes: []string{
+		"https://www.googleapis.com/auth/userinfo.email",
+		"https://www.googleapis.com/auth/userinfo.profile",
+	},
+	Endpoint: google.Endpoint,
 }
 
 func generateRandomState() string {
-    b := make([]byte, 16)
-    rand.Read(b)
-    return base64.URLEncoding.EncodeToString(b)
+	b := make([]byte, 16)
+	rand.Read(b)
+	return base64.URLEncoding.EncodeToString(b)
 }
 
 func (ac *AuthController) HandleGoogleLogin(c *gin.Context) {
-    state := generateRandomState()
-    c.SetCookie("oauth_state", state, 3600, "/", "", false, true)
+	state := generateRandomState()
+	c.SetCookie("oauth_state", state, 3600, "/", "", false, true)
 
-    url := googleOauthConfig.AuthCodeURL(state)
-    c.Redirect(http.StatusTemporaryRedirect, url)
+	url := googleOauthConfig.AuthCodeURL(state)
+	c.Redirect(http.StatusTemporaryRedirect, url)
 }
-
 
 func (ac *AuthController) HandleGoogleCallback(c *gin.Context) {
 	storedState, _ := c.Cookie("oauth_state")
@@ -254,5 +256,15 @@ func (ac *AuthController) HandleGoogleCallback(c *gin.Context) {
 		true,
 	)
 
-	utils.Success(c, http.StatusOK, "google login successful", result.Response)
+	userJSON, err := json.Marshal(result.Response.User)
+	if err != nil {
+		ac.log.Error("failed to encode google user", zap.Error(err))
+		utils.Fail(c, http.StatusInternalServerError, "cannot login with google")
+		return
+	}
+
+	redirectTo := ac.frontendURL + "/auth/google/callback?access_token=" +
+		url.QueryEscape(result.Response.AccessToken) +
+		"&user=" + url.QueryEscape(base64.RawURLEncoding.EncodeToString(userJSON))
+	c.Redirect(http.StatusTemporaryRedirect, redirectTo)
 }
