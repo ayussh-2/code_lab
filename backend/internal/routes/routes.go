@@ -12,4 +12,5 @@ func RegisterRoutes(server *gin.Engine, log *zap.Logger, db *gorm.DB, cfg *confi
 	HealthRoutes(server, log)
 	api := server.Group("/api")
 	AuthRoutes(api, log, db, cfg)
+	ProblemRoutes(api, log, db, cfg)
 }
