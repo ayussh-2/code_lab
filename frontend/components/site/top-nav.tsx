@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ProfileMenu } from "@/components/site/profile-menu";
 
 export function TopNav() {
     return (
@@ -18,12 +19,7 @@ export function TopNav() {
                         >
                             Problems
                         </Link>
-                        <Link
-                            href="/profile"
-                            className="text-sm text-zinc-400 transition-colors hover:text-white"
-                        >
-                            Profile
-                        </Link>
+                        <ProfileMenu />
                     </nav>
                 </div>
             </div>

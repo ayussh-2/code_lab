@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ApiError } from "@/lib/api";
 import { login } from "@/lib/auth";
@@ -37,6 +38,12 @@ export function LoginForm() {
             router.push("/problems");
         } catch (error) {
             if (error instanceof ApiError) {
+                if (error.status === 403 && /not verified/i.test(error.message)) {
+                    router.push(
+                        `/auth/verify-email?email=${encodeURIComponent(email)}`,
+                    );
+                    return;
+                }
                 setErrorMessage(error.message);
             } else {
                 setErrorMessage("Unable to login");
@@ -74,6 +81,12 @@ export function LoginForm() {
                         >
                             Password
                         </label>
+                        <Link
+                            href="/auth/forgot-password"
+                            className="text-xs text-zinc-400 underline decoration-zinc-700 underline-offset-4 transition-colors hover:text-white hover:decoration-white"
+                        >
+                            Forgot password?
+                        </Link>
                     </div>
                     <input
                         id="password"

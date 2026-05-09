@@ -28,6 +28,13 @@ type Config struct {
 	GoogleClientID     string
 	GoogleClientSecret string
 	GoogleRedirectURI  string
+
+	GmailIdentity string
+	GmailUserName string
+	GmailPassword string
+	GmailHost     string
+	GmailPort     string
+	GmailFrom     string
 }
 
 func LoadConfig() *Config {
@@ -55,6 +62,13 @@ func LoadConfig() *Config {
 		GoogleClientID:     GetENV("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret: GetENV("GOOGLE_CLIENT_SECRET", ""),
 		GoogleRedirectURI:  GetENV("GOOGLE_REDIRECT_URI", "http://localhost:8080/auth/google/callback"),
+
+		GmailIdentity: GetENV("GMAIL_IDENTITY", ""),
+		GmailUserName: GetENV("GMAIL_EMAIL", ""),
+		GmailPassword: GetENV("GMAIL_APP_PASSWORD", ""),
+		GmailHost:     GetENV("GMAIL_HOST", "smtp.gmail.com"),
+		GmailPort:     GetENV("GMAIL_PORT", "587"),
+		GmailFrom:     GetENV("GMAIL_FROM", ""),
 	}
 }
 

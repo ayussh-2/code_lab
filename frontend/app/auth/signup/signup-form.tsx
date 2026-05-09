@@ -27,7 +27,7 @@ export function SignupForm() {
 
     try {
       await signup({ name, email, password });
-      router.push("/login");
+      router.push(`/auth/verify-email?email=${encodeURIComponent(email)}`);
     } catch (error) {
       if (error instanceof ApiError) {
         setErrorMessage(error.message);

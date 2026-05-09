@@ -1,4 +1,5 @@
 import type { ProblemDetail } from "@/lib/problems";
+import { MarkdownKatexView } from "@/components/markdown/markdown-katex-view";
 import { ErrorState, LoadingState } from "@/components/ui/async-state";
 import {
   PROBLEM_DETAIL_TABS,
@@ -58,7 +59,7 @@ export function ProblemDescriptionPane({
               </span>
             </div>
 
-            <p className="text-sm leading-7 text-zinc-400">{problem.details}</p>
+            <MarkdownKatexView markdown={problem.details} />
 
             {problem.examples.length > 0 && (
               <div>

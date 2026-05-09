@@ -8,6 +8,11 @@ export function getAccessToken(): string | null {
   return localStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
+export function setAccessToken(token: string) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(ACCESS_TOKEN_KEY, token);
+}
+
 export function getStoredUser<T>(): T | null {
   if (typeof window === "undefined") {
     return null;
@@ -23,6 +28,16 @@ export function getStoredUser<T>(): T | null {
   } catch {
     return null;
   }
+}
+
+export function setStoredUser<T>(user: T) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+}
+
+export function saveSession<T>(accessToken: string, user: T) {
+  setAccessToken(accessToken);
+  setStoredUser(user);
 }
 
 export function clearSession() {

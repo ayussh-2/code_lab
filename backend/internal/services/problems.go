@@ -78,6 +78,7 @@ type ProblemDetail struct {
 	Slug            string                   `json:"slug"`
 	Difficulty      string                   `json:"difficulty"`
 	Topics          []string                 `json:"topics"`
+	TopicIDs        []uint                   `json:"topic_ids"`
 	Hint            []string                 `json:"hints"`
 	Details         string                   `json:"details"`
 	Examples        []models.Example         `json:"examples"`
@@ -151,6 +152,7 @@ func (ps *ProblemService) GetProblemBySlug(slug string) (*ProblemDetail, error) 
 		Slug:            problem.Slug,
 		Difficulty:      problem.Difficulty,
 		Topics:          ps.topicNamesByIDs(problem.Topics),
+		TopicIDs:        problem.Topics,
 		Hint:            problem.Hint,
 		Details:         problem.Details,
 		Examples:        problem.Examples,
@@ -161,6 +163,90 @@ func (ps *ProblemService) GetProblemBySlug(slug string) (*ProblemDetail, error) 
 	}
 
 	return &resp, nil
+}
+
+func (ps *ProblemService) UpdateProblemBySlug(slug string, p Problem) (*models.Problems, error) {
+	var existing models.Problems
+	if err := ps.db.Where("slug = ?", slug).First(&existing).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, utils.NewAppError(http.StatusNotFound, "problem not found", err)
+		}
+		ps.log.Error("failed to fetch problem for update", zap.Error(err))
+		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot update problem", err)
+	}
+
+	examples := make([]models.Example, len(p.Examples))
+	for i := range p.Examples {
+		examples[i] = models.Example{
+			Input:       p.Examples[i].Input,
+			Output:      p.Examples[i].Output,
+			Explanation: p.Examples[i].Explanation,
+		}
+	}
+
+	txErr := ps.db.Transaction(func(tx *gorm.DB) error {
+		updates := map[string]any{
+			"title":       p.Title,
+			"difficulty":  p.Difficulty,
+			"topics":      p.Topics,
+			"hint":        p.Hint,
+			"details":     p.Details,
+			"examples":    examples,
+			"constraints": p.Constraints,
+		}
+		if err := tx.Model(&models.Problems{}).Where("id = ?", existing.ID).Updates(updates).Error; err != nil {
+			ps.log.Error("failed to update problem", zap.Error(err))
+			return utils.NewAppError(http.StatusInternalServerError, "cannot update problem", err)
+		}
+
+		if err := tx.Where("problem_id = ?", existing.ID).Delete(&models.SampleTestCases{}).Error; err != nil {
+			ps.log.Error("failed to clear sample test cases", zap.Error(err))
+			return utils.NewAppError(http.StatusInternalServerError, "cannot update problem", err)
+		}
+
+		if len(p.SampleTestCases) > 0 {
+			samples := make([]models.SampleTestCases, len(p.SampleTestCases))
+			for i := range p.SampleTestCases {
+				samples[i] = models.SampleTestCases{
+					ProblemID: existing.ID,
+					Input:     p.SampleTestCases[i].Input,
+					Expected:  p.SampleTestCases[i].Expected,
+				}
+			}
+			if err := tx.Create(&samples).Error; err != nil {
+				ps.log.Error("failed to recreate sample test cases", zap.Error(err))
+				return utils.NewAppError(http.StatusInternalServerError, "cannot update problem", err)
+			}
+		}
+		return nil
+	})
+	if txErr != nil {
+		return nil, txErr
+	}
+
+	var refreshed models.Problems
+	if err := ps.db.Preload("SampleTestCases").Where("id = ?", existing.ID).First(&refreshed).Error; err != nil {
+		ps.log.Error("failed to reload problem after update", zap.Error(err))
+		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot update problem", err)
+	}
+	return &refreshed, nil
+}
+
+func (ps *ProblemService) DeleteProblemBySlug(slug string) error {
+	var existing models.Problems
+	if err := ps.db.Where("slug = ?", slug).First(&existing).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return utils.NewAppError(http.StatusNotFound, "problem not found", err)
+		}
+		ps.log.Error("failed to fetch problem for delete", zap.Error(err))
+		return utils.NewAppError(http.StatusInternalServerError, "cannot delete problem", err)
+	}
+
+	if err := ps.db.Delete(&existing).Error; err != nil {
+		ps.log.Error("failed to delete problem", zap.Error(err))
+		return utils.NewAppError(http.StatusInternalServerError, "cannot delete problem", err)
+	}
+	return nil
 }
 
 func (ps *ProblemService) AddTopic(input TopicInput) (*models.Topics, error) {

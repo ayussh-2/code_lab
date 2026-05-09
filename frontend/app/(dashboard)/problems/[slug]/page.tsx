@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ApiError } from "@/lib/api";
-import { TopNav } from "@/components/site/top-nav";
 import { type ProblemDetail, getProblemBySlug } from "@/lib/problems";
 import { ProblemDescriptionPane } from "@/components/problems/problem-description-pane";
 import { ProblemEditorPane } from "@/components/problems/problem-editor-pane";

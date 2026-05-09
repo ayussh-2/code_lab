@@ -170,6 +170,63 @@ func (pc *ProblemController) CreateTopic(c *gin.Context) {
 	utils.Success(c, http.StatusCreated, "topic created", resp)
 }
 
+func (pc *ProblemController) UpdateProblem(c *gin.Context) {
+	slug := c.Param("slug")
+	if slug == "" {
+		utils.Fail(c, http.StatusBadRequest, "missing slug")
+		return
+	}
+
+	var req CreateProblemRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		pc.log.Error("failed to parse update problem request", zap.Error(err))
+		utils.ValidationFail(c, "Validation Failed", utils.ValidationErrors(err))
+		return
+	}
+
+	resp, err := pc.svc.UpdateProblemBySlug(slug, services.Problem{
+		Title:           req.Title,
+		Difficulty:      req.Difficulty,
+		Topics:          req.Topics,
+		Hint:            req.Hint,
+		Details:         req.Details,
+		Examples:        req.Examples,
+		Constraints:     req.Constraints,
+		SampleTestCases: req.SampleTestCases,
+	})
+	if err != nil {
+		var appErr *utils.AppError
+		if errors.As(err, &appErr) {
+			utils.Fail(c, appErr.Status, appErr.Message)
+			return
+		}
+		utils.Fail(c, http.StatusInternalServerError, "cannot update problem")
+		return
+	}
+
+	utils.Success(c, http.StatusOK, "problem updated", resp)
+}
+
+func (pc *ProblemController) DeleteProblem(c *gin.Context) {
+	slug := c.Param("slug")
+	if slug == "" {
+		utils.Fail(c, http.StatusBadRequest, "missing slug")
+		return
+	}
+
+	if err := pc.svc.DeleteProblemBySlug(slug); err != nil {
+		var appErr *utils.AppError
+		if errors.As(err, &appErr) {
+			utils.Fail(c, appErr.Status, appErr.Message)
+			return
+		}
+		utils.Fail(c, http.StatusInternalServerError, "cannot delete problem")
+		return
+	}
+
+	utils.Success(c, http.StatusOK, "problem deleted", nil)
+}
+
 func (pc *ProblemController) ListTopics(c *gin.Context) {
 	resp, err := pc.svc.ListTopics()
 	if err != nil {

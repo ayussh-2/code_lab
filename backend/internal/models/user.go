@@ -8,6 +8,7 @@ type User struct {
 	Password              string     `gorm:"not null;size:255" json:"-"`
 	Name                  string     `gorm:"size:100" json:"first_name"`
 	Role                  string     `gorm:"not null;size:50;default:user" json:"role"`
+	EmailVerified         bool       `gorm:"not null;default:true" json:"email_verified"`
 	RefreshTokenHash      string     `gorm:"size:255" json:"-"`
 	RefreshTokenExpiresAt *time.Time `json:"-"`
 	CreatedAt             time.Time  `json:"created_at"`

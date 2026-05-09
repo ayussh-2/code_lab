@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { API_BASE_URL, ApiError } from "@/lib/api";
-import { clearSession, getAccessToken, getStoredUser } from "@/lib/session";
+import { ApiError, apiRequestWithAuth } from "@/lib/api";
+import { logout } from "@/lib/auth";
+import { getAccessToken, getStoredUser } from "@/lib/session";
 import { TopNav } from "@/components/site/top-nav";
 import { ErrorState, LoadingState } from "@/components/ui/async-state";
 import { useState } from "react";
@@ -39,29 +40,17 @@ export default function ProfilePage() {
     useEffect(() => {
         async function loadProfile() {
             if (!isClient) return;
-            const token = getAccessToken();
-            if (!token) {
-                router.replace("/auth/login");
-                return;
-            }
             try {
-                const response = await fetch(`${API_BASE_URL}/auth/me`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                    credentials: "include",
-                });
-                const payload = (await response.json()) as {
-                    error: boolean;
-                    message: string;
-                    data?: MeResponse;
-                };
-                if (!response.ok || payload.error || !payload.data) {
-                    throw new ApiError(
-                        payload.message || "Unable to load profile",
-                        response.status,
-                    );
-                }
-                setMe(payload.data);
+                const result = await apiRequestWithAuth<MeResponse>(
+                    "/auth/me",
+                    getAccessToken(),
+                );
+                setMe(result.data);
             } catch (error) {
+                if (error instanceof ApiError && error.status === 401) {
+                    router.replace("/auth/login");
+                    return;
+                }
                 setErrorMessage(
                     error instanceof ApiError
                         ? error.message
@@ -74,9 +63,12 @@ export default function ProfilePage() {
         void loadProfile();
     }, [isClient, router]);
 
-    function handleLogout() {
-        clearSession();
-        router.replace("/auth/login");
+    async function handleLogout() {
+        try {
+            await logout();
+        } finally {
+            router.replace("/auth/login");
+        }
     }
 
     if (!isClient) {

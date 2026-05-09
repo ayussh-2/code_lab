@@ -35,6 +35,21 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required,min=6,max=255"`
 }
 
+type EmailRequest struct {
+	Email string `json:"email" binding:"required,email,max=255"`
+}
+
+type VerifyEmailRequest struct {
+	Email string `json:"email" binding:"required,email,max=255"`
+	Code  string `json:"code" binding:"required,min=4,max=10"`
+}
+
+type ConfirmPasswordResetRequest struct {
+	Email       string `json:"email" binding:"required,email,max=255"`
+	Code        string `json:"code" binding:"required,min=4,max=10"`
+	NewPassword string `json:"new_password" binding:"required,min=6,max=255"`
+}
+
 func NewAuthController(log *zap.Logger, svc *services.AuthService, frontendURL string) *AuthController {
 	return &AuthController{
 		log:         log,
@@ -171,6 +186,86 @@ func (ac *AuthController) Logout(c *gin.Context) {
 
 	c.SetCookie(ac.svc.RefreshCookieName(), "", -1, "/", "", false, true)
 	utils.Success(c, http.StatusOK, "logout successful", nil)
+}
+
+func (ac *AuthController) RequestPasswordReset(c *gin.Context) {
+	var req EmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ValidationFail(c, "Validation Failed", utils.ValidationErrors(err))
+		return
+	}
+
+	if err := ac.svc.RequestPasswordResetOTP(req.Email); err != nil {
+		var appErr *utils.AppError
+		if errors.As(err, &appErr) {
+			utils.Fail(c, appErr.Status, appErr.Message)
+			return
+		}
+		utils.Fail(c, http.StatusInternalServerError, "cannot send reset code")
+		return
+	}
+
+	utils.Success(c, http.StatusOK, "if the email exists, a reset code has been sent", nil)
+}
+
+func (ac *AuthController) ConfirmPasswordReset(c *gin.Context) {
+	var req ConfirmPasswordResetRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ValidationFail(c, "Validation Failed", utils.ValidationErrors(err))
+		return
+	}
+
+	if err := ac.svc.ConfirmPasswordReset(req.Email, req.Code, req.NewPassword); err != nil {
+		var appErr *utils.AppError
+		if errors.As(err, &appErr) {
+			utils.Fail(c, appErr.Status, appErr.Message)
+			return
+		}
+		utils.Fail(c, http.StatusInternalServerError, "cannot reset password")
+		return
+	}
+
+	utils.Success(c, http.StatusOK, "password reset successful", nil)
+}
+
+func (ac *AuthController) VerifyEmail(c *gin.Context) {
+	var req VerifyEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ValidationFail(c, "Validation Failed", utils.ValidationErrors(err))
+		return
+	}
+
+	if err := ac.svc.VerifyEmail(req.Email, req.Code); err != nil {
+		var appErr *utils.AppError
+		if errors.As(err, &appErr) {
+			utils.Fail(c, appErr.Status, appErr.Message)
+			return
+		}
+		utils.Fail(c, http.StatusInternalServerError, "cannot verify email")
+		return
+	}
+
+	utils.Success(c, http.StatusOK, "email verified", nil)
+}
+
+func (ac *AuthController) ResendVerificationEmail(c *gin.Context) {
+	var req EmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.ValidationFail(c, "Validation Failed", utils.ValidationErrors(err))
+		return
+	}
+
+	if err := ac.svc.ResendEmailVerificationOTP(req.Email); err != nil {
+		var appErr *utils.AppError
+		if errors.As(err, &appErr) {
+			utils.Fail(c, appErr.Status, appErr.Message)
+			return
+		}
+		utils.Fail(c, http.StatusInternalServerError, "cannot send verification code")
+		return
+	}
+
+	utils.Success(c, http.StatusOK, "verification code sent", nil)
 }
 
 var googleOauthConfig = &oauth2.Config{
