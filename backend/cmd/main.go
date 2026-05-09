@@ -35,6 +35,7 @@ func main() {
 	server := gin.New()
 	server.Use(gin.Logger(), gin.Recovery())
 	server.Use(middlewares.CORSMiddleware(cfg.FrontendURL))
+	server.Use(middlewares.CSRFOriginCheck(cfg.FrontendURL))
 
 	routes.RegisterRoutes(server, log, db, cfg)
 

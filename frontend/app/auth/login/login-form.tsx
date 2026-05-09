@@ -26,15 +26,7 @@ export function LoginForm() {
         setIsLoading(true);
 
         try {
-            const result = await login({ email, password });
-            localStorage.setItem(
-                "code_lab_access_token",
-                result.data.access_token,
-            );
-            localStorage.setItem(
-                "code_lab_user",
-                JSON.stringify(result.data.user),
-            );
+            await login({ email, password });
             router.push("/problems");
         } catch (error) {
             if (error instanceof ApiError) {

@@ -11,21 +11,14 @@ import (
 
 func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		authHeader := c.GetHeader("Authorization")
-		if authHeader == "" {
-			utils.Fail(c, http.StatusUnauthorized, "missing authorization header")
+		token := readAccessToken(c, cfg.AccessCookie)
+		if token == "" {
+			utils.Fail(c, http.StatusUnauthorized, "missing credentials")
 			c.Abort()
 			return
 		}
 
-		parts := strings.SplitN(authHeader, " ", 2)
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			utils.Fail(c, http.StatusUnauthorized, "invalid authorization header")
-			c.Abort()
-			return
-		}
-
-		claims, err := utils.ParseAccessToken(cfg, parts[1])
+		claims, err := utils.ParseAccessToken(cfg, token)
 		if err != nil {
 			utils.Fail(c, http.StatusUnauthorized, "invalid or expired token")
 			c.Abort()
@@ -37,6 +30,22 @@ func AuthMiddleware(cfg *config.Config) gin.HandlerFunc {
 		c.Set("role", claims.Role)
 		c.Next()
 	}
+}
+
+func readAccessToken(c *gin.Context, cookieName string) string {
+	if cookie, err := c.Cookie(cookieName); err == nil && cookie != "" {
+		return cookie
+	}
+
+	header := c.GetHeader("Authorization")
+	if header == "" {
+		return ""
+	}
+	parts := strings.SplitN(header, " ", 2)
+	if len(parts) != 2 || parts[0] != "Bearer" {
+		return ""
+	}
+	return parts[1]
 }
 
 func RequireRoles(roles ...string) gin.HandlerFunc {

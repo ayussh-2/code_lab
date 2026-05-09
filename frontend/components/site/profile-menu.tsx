@@ -3,19 +3,14 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { logout, type User } from "@/lib/auth";
-import { getStoredUser } from "@/lib/session";
+import { useAuth } from "@/components/auth/auth-context";
 
 export function ProfileMenu() {
     const router = useRouter();
-    const [user, setUser] = useState<User | null>(null);
+    const { user, logout, isLoading } = useAuth();
     const [open, setOpen] = useState(false);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
     const containerRef = useRef<HTMLDivElement | null>(null);
-
-    useEffect(() => {
-        setUser(getStoredUser<User>());
-    }, []);
 
     useEffect(() => {
         if (!open) return;
@@ -35,6 +30,8 @@ export function ProfileMenu() {
             document.removeEventListener("keydown", onKey);
         };
     }, [open]);
+
+    if (isLoading) return null;
 
     if (!user) {
         return (

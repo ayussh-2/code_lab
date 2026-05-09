@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"net/url"
 
 	"github.com/ayussh-2/config"
 	"github.com/ayussh-2/internal/services"
@@ -106,28 +105,35 @@ func (ac *AuthController) Login(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie(
-		ac.svc.RefreshCookieName(),
-		result.RefreshToken,
-		ac.svc.RefreshCookieMaxAgeSeconds(),
-		"/",
-		"",
-		false,
-		true,
-	)
+	ac.setAuthCookies(c, result.AccessToken, result.RefreshToken)
 
 	utils.Success(c, http.StatusOK, "login successful", result.Response)
 }
 
 func (ac *AuthController) Me(c *gin.Context) {
-	userID, _ := c.Get("userID")
-	email, _ := c.Get("email")
-	role, _ := c.Get("role")
-	utils.Success(c, http.StatusOK, "authenticated user", gin.H{
-		"user_id": userID,
-		"email":   email,
-		"role":    role,
-	})
+	userIDVal, ok := c.Get("userID")
+	if !ok {
+		utils.Fail(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	userID, ok := userIDVal.(uint)
+	if !ok {
+		utils.Fail(c, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+
+	user, err := ac.svc.GetUserByID(userID)
+	if err != nil {
+		var appErr *utils.AppError
+		if errors.As(err, &appErr) {
+			utils.Fail(c, appErr.Status, appErr.Message)
+			return
+		}
+		utils.Fail(c, http.StatusInternalServerError, "cannot fetch user")
+		return
+	}
+
+	utils.Success(c, http.StatusOK, "authenticated user", gin.H{"user": user})
 }
 
 func (ac *AuthController) Refresh(c *gin.Context) {
@@ -148,17 +154,21 @@ func (ac *AuthController) Refresh(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie(
-		ac.svc.RefreshCookieName(),
-		result.RefreshToken,
-		ac.svc.RefreshCookieMaxAgeSeconds(),
-		"/",
-		"",
-		false,
-		true,
-	)
+	ac.setAuthCookies(c, result.AccessToken, result.RefreshToken)
 
 	utils.Success(c, http.StatusOK, "token refreshed", result.Response)
+}
+
+func (ac *AuthController) setAuthCookies(c *gin.Context, accessToken, refreshToken string) {
+	secure := ac.svc.IsSecureCookie()
+	utils.SetAuthCookie(c, ac.svc.AccessCookieName(), accessToken, ac.svc.AccessCookieMaxAgeSeconds(), secure)
+	utils.SetAuthCookie(c, ac.svc.RefreshCookieName(), refreshToken, ac.svc.RefreshCookieMaxAgeSeconds(), secure)
+}
+
+func (ac *AuthController) clearAuthCookies(c *gin.Context) {
+	secure := ac.svc.IsSecureCookie()
+	utils.ClearAuthCookie(c, ac.svc.AccessCookieName(), secure)
+	utils.ClearAuthCookie(c, ac.svc.RefreshCookieName(), secure)
 }
 
 func (ac *AuthController) Logout(c *gin.Context) {
@@ -184,7 +194,7 @@ func (ac *AuthController) Logout(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie(ac.svc.RefreshCookieName(), "", -1, "/", "", false, true)
+	ac.clearAuthCookies(c)
 	utils.Success(c, http.StatusOK, "logout successful", nil)
 }
 
@@ -341,25 +351,7 @@ func (ac *AuthController) HandleGoogleCallback(c *gin.Context) {
 		return
 	}
 
-	c.SetCookie(
-		ac.svc.RefreshCookieName(),
-		result.RefreshToken,
-		ac.svc.RefreshCookieMaxAgeSeconds(),
-		"/",
-		"",
-		false,
-		true,
-	)
+	ac.setAuthCookies(c, result.AccessToken, result.RefreshToken)
 
-	userJSON, err := json.Marshal(result.Response.User)
-	if err != nil {
-		ac.log.Error("failed to encode google user", zap.Error(err))
-		utils.Fail(c, http.StatusInternalServerError, "cannot login with google")
-		return
-	}
-
-	redirectTo := ac.frontendURL + "/auth/google/callback?access_token=" +
-		url.QueryEscape(result.Response.AccessToken) +
-		"&user=" + url.QueryEscape(base64.RawURLEncoding.EncodeToString(userJSON))
-	c.Redirect(http.StatusTemporaryRedirect, redirectTo)
+	c.Redirect(http.StatusTemporaryRedirect, ac.frontendURL+"/auth/google/callback")
 }

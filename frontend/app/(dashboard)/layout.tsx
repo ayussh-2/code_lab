@@ -1,5 +1,5 @@
 import { TopNav } from "@/components/site/top-nav";
-import { SessionBoot } from "@/components/auth/session-boot";
+import { AuthProvider } from "@/components/auth/auth-context";
 
 export default function DashboardLayout({
     children,
@@ -7,11 +7,11 @@ export default function DashboardLayout({
     children: React.ReactNode;
 }) {
     return (
-        <SessionBoot>
+        <AuthProvider>
             <div>
                 <TopNav />
                 {children}
             </div>
-        </SessionBoot>
+        </AuthProvider>
     );
 }

@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { ProblemForm } from "@/components/admin/problem-form";
 import { useAdminGuard } from "@/hooks/use-admin-guard";
 import { createProblem } from "@/lib/problems";
-import { getAccessToken } from "@/lib/session";
 
 export default function AdminNewProblemPage() {
     const router = useRouter();
@@ -39,10 +38,7 @@ export default function AdminNewProblemPage() {
                     submitLabel="Create problem"
                     submittingLabel="Creating..."
                     onSubmit={async (payload) => {
-                        const result = await createProblem(
-                            getAccessToken(),
-                            payload,
-                        );
+                        const result = await createProblem(payload);
                         router.push(`/problems/${result.data.slug}`);
                     }}
                 />

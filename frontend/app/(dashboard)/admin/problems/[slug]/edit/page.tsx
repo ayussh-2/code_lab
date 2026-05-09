@@ -8,7 +8,6 @@ import {
     getProblemBySlug,
     updateProblem,
 } from "@/lib/problems";
-import { getAccessToken } from "@/lib/session";
 import {
     ProblemForm,
     type ProblemFormInitialValues,
@@ -110,11 +109,7 @@ export default function AdminEditProblemPage() {
                     submitLabel="Save changes"
                     submittingLabel="Saving..."
                     onSubmit={async (payload) => {
-                        await updateProblem(
-                            getAccessToken(),
-                            slug as string,
-                            payload,
-                        );
+                        await updateProblem(slug as string, payload);
                         router.push("/admin/problems");
                     }}
                 />

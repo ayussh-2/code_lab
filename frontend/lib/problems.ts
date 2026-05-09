@@ -1,4 +1,4 @@
-import { apiRequest, apiRequestWithAuth } from "@/lib/api";
+import { apiRequest } from "@/lib/api";
 import {
     frontendQuestionsAsListItems,
     getFrontendQuestionBySlug,
@@ -101,26 +101,25 @@ export interface CreatedProblem {
   difficulty: string;
 }
 
-export async function createProblem(token: string | null, body: CreateProblemPayload) {
-  return apiRequestWithAuth<CreatedProblem>(`/problems`, token, {
+export async function createProblem(body: CreateProblemPayload) {
+  return apiRequest<CreatedProblem>(`/problems`, {
     method: "POST",
     body,
   });
 }
 
 export async function updateProblem(
-  token: string | null,
   slug: string,
   body: CreateProblemPayload,
 ) {
-  return apiRequestWithAuth<CreatedProblem>(`/problems/${slug}`, token, {
+  return apiRequest<CreatedProblem>(`/problems/${slug}`, {
     method: "PATCH",
     body,
   });
 }
 
-export async function deleteProblem(token: string | null, slug: string) {
-  return apiRequestWithAuth<null>(`/problems/${slug}`, token, {
+export async function deleteProblem(slug: string) {
+  return apiRequest<null>(`/problems/${slug}`, {
     method: "DELETE",
   });
 }

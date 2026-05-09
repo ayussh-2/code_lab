@@ -1,11 +1,4 @@
-import {
-  API_BASE_URL,
-  ApiError,
-  apiRequest,
-  apiRequestWithAuth,
-  refreshAccessToken,
-} from "@/lib/api";
-import { clearSession, getAccessToken } from "@/lib/session";
+import { API_BASE_URL, apiRequest } from "@/lib/api";
 
 export interface User {
   id: number;
@@ -15,7 +8,10 @@ export interface User {
 }
 
 export interface LoginResponse {
-  access_token: string;
+  user: User;
+}
+
+export interface MeResponse {
   user: User;
 }
 
@@ -55,6 +51,10 @@ export async function signup(payload: SignupPayload) {
   });
 }
 
+export async function me() {
+  return apiRequest<MeResponse>("/auth/me");
+}
+
 export async function verifyEmail(payload: { email: string; code: string }) {
   return apiRequest<null>("/auth/verify-email", {
     method: "POST",
@@ -88,22 +88,5 @@ export async function confirmPasswordReset(payload: {
 }
 
 export async function logout() {
-  const token = getAccessToken();
-  try {
-    if (token) {
-      await apiRequestWithAuth<null>("/auth/logout", token, { method: "POST" });
-    }
-  } catch (error) {
-    if (!(error instanceof ApiError) || error.status !== 401) {
-      throw error;
-    }
-  } finally {
-    clearSession();
-  }
-}
-
-export async function ensureSession(): Promise<boolean> {
-  if (getAccessToken()) return true;
-  const token = await refreshAccessToken();
-  return token !== null;
+  await apiRequest<null>("/auth/logout", { method: "POST" });
 }

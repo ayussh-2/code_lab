@@ -8,7 +8,6 @@ import {
     deleteProblem,
     getProblems,
 } from "@/lib/problems";
-import { getAccessToken } from "@/lib/session";
 import { useAdminGuard } from "@/hooks/use-admin-guard";
 import { Chip } from "@/components/ui/chip";
 import { ErrorState, LoadingState } from "@/components/ui/async-state";
@@ -50,7 +49,7 @@ export default function AdminProblemsPage() {
 
         setPendingSlug(slug);
         try {
-            await deleteProblem(getAccessToken(), slug);
+            await deleteProblem(slug);
             setProblems((prev) => prev.filter((p) => p.slug !== slug));
         } catch (error) {
             window.alert(

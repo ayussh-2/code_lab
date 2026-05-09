@@ -1,67 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ApiError, apiRequestWithAuth } from "@/lib/api";
-import { logout } from "@/lib/auth";
-import { getAccessToken, getStoredUser } from "@/lib/session";
-import { TopNav } from "@/components/site/top-nav";
-import { ErrorState, LoadingState } from "@/components/ui/async-state";
-import { useState } from "react";
-
-interface MeResponse {
-    user_id: number;
-    email: string;
-    role: string;
-}
-
-interface StoredUser {
-    name: string;
-    email: string;
-}
+import { useAuth } from "@/components/auth/auth-context";
+import { LoadingState } from "@/components/ui/async-state";
 
 export default function ProfilePage() {
     const router = useRouter();
-    const [me, setMe] = useState<MeResponse | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [errorMessage, setErrorMessage] = useState("");
-
-    const isClient = useSyncExternalStore(
-        () => () => {},
-        () => true,
-        () => false,
-    );
-
-    const storedUser = useMemo<StoredUser | null>(() => {
-        if (!isClient) return null;
-        return getStoredUser<StoredUser>();
-    }, [isClient]);
+    const { user, isLoading, logout } = useAuth();
 
     useEffect(() => {
-        async function loadProfile() {
-            if (!isClient) return;
-            try {
-                const result = await apiRequestWithAuth<MeResponse>(
-                    "/auth/me",
-                    getAccessToken(),
-                );
-                setMe(result.data);
-            } catch (error) {
-                if (error instanceof ApiError && error.status === 401) {
-                    router.replace("/auth/login");
-                    return;
-                }
-                setErrorMessage(
-                    error instanceof ApiError
-                        ? error.message
-                        : "Unable to load profile",
-                );
-            } finally {
-                setIsLoading(false);
-            }
+        if (!isLoading && !user) {
+            router.replace("/auth/login");
         }
-        void loadProfile();
-    }, [isClient, router]);
+    }, [user, isLoading, router]);
 
     async function handleLogout() {
         try {
@@ -71,7 +23,7 @@ export default function ProfilePage() {
         }
     }
 
-    if (!isClient) {
+    if (isLoading || !user) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-[#0e0e0e] text-sm text-zinc-500">
                 <LoadingState message="Loading..." />
@@ -82,34 +34,21 @@ export default function ProfilePage() {
     return (
         <div className="flex min-h-screen flex-col bg-[#0e0e0e] text-zinc-300">
             <main className="mx-auto grid w-full max-w-[1100px] flex-1 grid-cols-1 gap-4 px-6 py-10 md:grid-cols-12">
-                {/* Left col */}
                 <section className="col-span-12 space-y-4 md:col-span-4">
                     <div className="rounded-lg border border-white/[0.08] bg-[#141414] p-6">
                         <div className="mb-5 flex items-center gap-4">
                             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/[0.06] text-2xl font-medium text-white">
-                                {(storedUser?.name?.[0] ?? "U").toUpperCase()}
+                                {(user.name?.[0] ?? "U").toUpperCase()}
                             </div>
                             <div>
                                 <h1 className="text-base font-semibold text-white">
-                                    {storedUser?.name ?? "User"}
+                                    {user.name}
                                 </h1>
                                 <p className="text-xs text-zinc-500">
-                                    {storedUser?.email ?? "-"}
+                                    {user.email}
                                 </p>
                             </div>
                         </div>
-                        {isLoading && (
-                            <LoadingState
-                                className="text-xs"
-                                message="Loading profile..."
-                            />
-                        )}
-                        {errorMessage && (
-                            <ErrorState
-                                className="text-xs"
-                                message={errorMessage}
-                            />
-                        )}
                         <button
                             type="button"
                             onClick={handleLogout}
@@ -120,7 +59,6 @@ export default function ProfilePage() {
                     </div>
                 </section>
 
-                {/* Right col */}
                 <section className="col-span-12 space-y-4 md:col-span-8">
                     <div className="grid grid-cols-2 gap-4">
                         <div className="rounded-lg border border-white/[0.08] bg-[#141414] p-5">
@@ -128,7 +66,7 @@ export default function ProfilePage() {
                                 User ID
                             </p>
                             <p className="mt-2 text-3xl font-semibold text-white">
-                                #{me?.user_id ?? "-"}
+                                #{user.id}
                             </p>
                         </div>
                         <div className="rounded-lg border border-white/[0.08] bg-[#141414] p-5">
@@ -136,7 +74,7 @@ export default function ProfilePage() {
                                 Role
                             </p>
                             <p className="mt-2 text-3xl font-semibold capitalize text-white">
-                                {me?.role ?? "-"}
+                                {user.role}
                             </p>
                         </div>
                     </div>
@@ -154,7 +92,7 @@ export default function ProfilePage() {
                                         Email
                                     </p>
                                     <p className="text-xs text-zinc-500">
-                                        {me?.email ?? storedUser?.email ?? "-"}
+                                        {user.email}
                                     </p>
                                 </div>
                                 <span className="rounded bg-[#1cbf73]/10 px-2 py-0.5 font-mono text-xs text-[#1cbf73]">
@@ -167,7 +105,7 @@ export default function ProfilePage() {
                                         Status
                                     </p>
                                     <p className="text-xs text-zinc-500">
-                                        Authenticated via /api/auth/me
+                                        Authenticated via HttpOnly cookies
                                     </p>
                                 </div>
                                 <span className="rounded bg-[#1cbf73]/10 px-2 py-0.5 font-mono text-xs text-[#1cbf73]">

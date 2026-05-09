@@ -185,16 +185,19 @@ func (ps *ProblemService) UpdateProblemBySlug(slug string, p Problem) (*models.P
 	}
 
 	txErr := ps.db.Transaction(func(tx *gorm.DB) error {
-		updates := map[string]any{
-			"title":       p.Title,
-			"difficulty":  p.Difficulty,
-			"topics":      p.Topics,
-			"hint":        p.Hint,
-			"details":     p.Details,
-			"examples":    examples,
-			"constraints": p.Constraints,
+		patch := models.Problems{
+			Title:       p.Title,
+			Difficulty:  p.Difficulty,
+			Topics:      p.Topics,
+			Hint:        p.Hint,
+			Details:     p.Details,
+			Examples:    examples,
+			Constraints: p.Constraints,
 		}
-		if err := tx.Model(&models.Problems{}).Where("id = ?", existing.ID).Updates(updates).Error; err != nil {
+		if err := tx.Model(&models.Problems{}).
+			Where("id = ?", existing.ID).
+			Select("Title", "Difficulty", "Topics", "Hint", "Details", "Examples", "Constraints").
+			Updates(&patch).Error; err != nil {
 			ps.log.Error("failed to update problem", zap.Error(err))
 			return utils.NewAppError(http.StatusInternalServerError, "cannot update problem", err)
 		}

@@ -44,24 +44,22 @@ type LoginInput struct {
 }
 
 type LoginResponse struct {
-	AccessToken string       `json:"access_token"`
-	User        UserResponse `json:"user"`
+	User UserResponse `json:"user"`
 }
 
 type RefreshResponse struct {
-	AccessToken string       `json:"access_token"`
-	User        UserResponse `json:"user"`
+	User UserResponse `json:"user"`
 }
 
 type LoginResult struct {
 	Response     LoginResponse
+	AccessToken  string
 	RefreshToken string
 }
 
-
-
 type RefreshResult struct {
 	Response     RefreshResponse
+	AccessToken  string
 	RefreshToken string
 }
 
@@ -231,7 +229,6 @@ func (a *AuthService) Login(input LoginInput, callbackEmail string, callbackName
 
 	return &LoginResult{
 		Response: LoginResponse{
-			AccessToken: accessToken,
 			User: UserResponse{
 				ID:    user.ID,
 				Name:  user.Name,
@@ -239,6 +236,7 @@ func (a *AuthService) Login(input LoginInput, callbackEmail string, callbackName
 				Role:  user.Role,
 			},
 		},
+		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
 	}, nil
 }
@@ -286,7 +284,6 @@ func (a *AuthService) Refresh(refreshToken string) (*RefreshResult, error) {
 
 	return &RefreshResult{
 		Response: RefreshResponse{
-			AccessToken: accessToken,
 			User: UserResponse{
 				ID:    user.ID,
 				Name:  user.Name,
@@ -294,6 +291,7 @@ func (a *AuthService) Refresh(refreshToken string) (*RefreshResult, error) {
 				Role:  user.Role,
 			},
 		},
+		AccessToken:  accessToken,
 		RefreshToken: newRefreshToken,
 	}, nil
 }
@@ -322,6 +320,39 @@ func (a *AuthService) RefreshCookieMaxAgeSeconds() int {
 		hours = 168
 	}
 	return hours * 3600
+}
+
+func (a *AuthService) AccessCookieName() string {
+	return a.cfg.AccessCookie
+}
+
+func (a *AuthService) AccessCookieMaxAgeSeconds() int {
+	minutes, err := strconv.Atoi(a.cfg.JWTExpiryMinutes)
+	if err != nil {
+		minutes = 15
+	}
+	return minutes * 60
+}
+
+func (a *AuthService) IsSecureCookie() bool {
+	return a.cfg.Env == "production"
+}
+
+func (a *AuthService) GetUserByID(id uint) (*UserResponse, error) {
+	var user models.User
+	if err := a.db.First(&user, id).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, utils.NewAppError(http.StatusNotFound, "user not found", nil)
+		}
+		a.log.Error("failed to fetch user", zap.Error(err))
+		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot fetch user", err)
+	}
+	return &UserResponse{
+		ID:    user.ID,
+		Name:  user.Name,
+		Email: user.Email,
+		Role:  user.Role,
+	}, nil
 }
 
 

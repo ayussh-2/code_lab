@@ -24,6 +24,7 @@ type Config struct {
 	RefreshJWTSecret string
 	RefreshExpiryHrs string
 	RefreshCookie    string
+	AccessCookie     string
 
 	GoogleClientID     string
 	GoogleClientSecret string
@@ -59,6 +60,7 @@ func LoadConfig() *Config {
 		RefreshJWTSecret:   GetENV("REFRESH_JWT_SECRET", "dev-refresh-super-secret"),
 		RefreshExpiryHrs:   GetENV("REFRESH_EXPIRY_HOURS", "168"),
 		RefreshCookie:      GetENV("REFRESH_COOKIE_NAME", "refresh_token"),
+		AccessCookie:       GetENV("ACCESS_COOKIE_NAME", "access_token"),
 		GoogleClientID:     GetENV("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret: GetENV("GOOGLE_CLIENT_SECRET", ""),
 		GoogleRedirectURI:  GetENV("GOOGLE_REDIRECT_URI", "http://localhost:8080/auth/google/callback"),
