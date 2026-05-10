@@ -207,6 +207,59 @@ func (pc *ProblemController) UpdateProblem(c *gin.Context) {
 	utils.Success(c, http.StatusOK, "problem updated", resp)
 }
 
+type ReplaceHiddenTestCasesRequest struct {
+	TestCases []services.SampleTestCases `json:"test_cases" binding:"required,dive"`
+}
+
+func (pc *ProblemController) ListHiddenTestCases(c *gin.Context) {
+	slug := c.Param("slug")
+	if slug == "" {
+		utils.Fail(c, http.StatusBadRequest, "missing slug")
+		return
+	}
+
+	resp, err := pc.svc.ListHiddenTestCases(slug)
+	if err != nil {
+		var appErr *utils.AppError
+		if errors.As(err, &appErr) {
+			utils.Fail(c, appErr.Status, appErr.Message)
+			return
+		}
+		utils.Fail(c, http.StatusInternalServerError, "cannot fetch hidden test cases")
+		return
+	}
+
+	utils.Success(c, http.StatusOK, "hidden test cases fetched", resp)
+}
+
+func (pc *ProblemController) ReplaceHiddenTestCases(c *gin.Context) {
+	slug := c.Param("slug")
+	if slug == "" {
+		utils.Fail(c, http.StatusBadRequest, "missing slug")
+		return
+	}
+
+	var req ReplaceHiddenTestCasesRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		pc.log.Error("failed to parse hidden test cases request", zap.Error(err))
+		utils.ValidationFail(c, "Validation Failed", utils.ValidationErrors(err))
+		return
+	}
+
+	resp, err := pc.svc.ReplaceHiddenTestCases(slug, req.TestCases)
+	if err != nil {
+		var appErr *utils.AppError
+		if errors.As(err, &appErr) {
+			utils.Fail(c, appErr.Status, appErr.Message)
+			return
+		}
+		utils.Fail(c, http.StatusInternalServerError, "cannot replace hidden test cases")
+		return
+	}
+
+	utils.Success(c, http.StatusOK, "hidden test cases saved", resp)
+}
+
 func (pc *ProblemController) DeleteProblem(c *gin.Context) {
 	slug := c.Param("slug")
 	if slug == "" {

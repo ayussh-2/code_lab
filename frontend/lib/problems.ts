@@ -123,3 +123,28 @@ export async function deleteProblem(slug: string) {
     method: "DELETE",
   });
 }
+
+export interface TestCaseRow {
+  id: number;
+  input: string;
+  expected: string;
+}
+
+export interface TestCaseInput {
+  input: string;
+  expected: string;
+}
+
+export async function getHiddenTestCases(slug: string) {
+  return apiRequest<TestCaseRow[]>(`/problems/${slug}/hidden-test-cases`);
+}
+
+export async function replaceHiddenTestCases(
+  slug: string,
+  testCases: TestCaseInput[],
+) {
+  return apiRequest<TestCaseRow[]>(`/problems/${slug}/hidden-test-cases`, {
+    method: "PUT",
+    body: { test_cases: testCases },
+  });
+}

@@ -12,6 +12,7 @@ import {
     ProblemForm,
     type ProblemFormInitialValues,
 } from "@/components/admin/problem-form";
+import { HiddenTestCasesPanel } from "@/components/admin/hidden-test-cases-panel";
 import { useAdminGuard } from "@/hooks/use-admin-guard";
 
 function toFormValues(p: ProblemDetail): ProblemFormInitialValues {
@@ -113,6 +114,23 @@ export default function AdminEditProblemPage() {
                         router.push("/admin/problems");
                     }}
                 />
+
+                <section className="mt-12 border-t border-white/[0.06] pt-10">
+                    <header className="mb-6">
+                        <p className="text-[11px] font-medium uppercase tracking-widest text-zinc-500">
+                            Grading
+                        </p>
+                        <h2 className="mt-2 text-xl font-semibold tracking-[-0.04em] text-white">
+                            Hidden test cases
+                        </h2>
+                        <p className="mt-2 max-w-xl text-sm leading-7 text-zinc-500">
+                            These run server-side to grade submissions and are
+                            never shown to learners. Saved independently from
+                            the problem metadata above.
+                        </p>
+                    </header>
+                    <HiddenTestCasesPanel slug={slug as string} />
+                </section>
             </main>
         </div>
     );

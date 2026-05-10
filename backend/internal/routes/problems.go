@@ -27,4 +27,6 @@ func ProblemRoutes(router *gin.RouterGroup, log *zap.Logger, db *gorm.DB, cfg *c
 	protected.POST("/bulk", controller.BulkCreateProblems)
 	protected.PATCH("/:slug", controller.UpdateProblem)
 	protected.DELETE("/:slug", controller.DeleteProblem)
+	protected.GET("/:slug/hidden-test-cases", controller.ListHiddenTestCases)
+	protected.PUT("/:slug/hidden-test-cases", controller.ReplaceHiddenTestCases)
 }

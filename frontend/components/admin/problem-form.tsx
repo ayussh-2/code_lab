@@ -9,6 +9,7 @@ import {
     listTopics,
 } from "@/lib/problems";
 import { ProblemMarkdownEditor } from "@/components/admin/problem-markdown-editor";
+import { TestCasesEditor } from "@/components/admin/test-cases-editor";
 
 const DEFAULT_DETAILS = `## Statement
 
@@ -48,10 +49,6 @@ function emptyExample() {
     return { input: "", output: "", explanation: "" };
 }
 
-function emptySample() {
-    return { input: "", expected: "" };
-}
-
 function defaults(): ProblemFormInitialValues {
     return {
         title: "",
@@ -61,7 +58,7 @@ function defaults(): ProblemFormInitialValues {
         details: DEFAULT_DETAILS,
         examples: [emptyExample()],
         constraints: [""],
-        samples: [emptySample()],
+        samples: [{ input: "", expected: "" }],
     };
 }
 
@@ -95,7 +92,7 @@ export function ProblemForm({
         seed.constraints.length > 0 ? seed.constraints : [""],
     );
     const [samples, setSamples] = useState(
-        seed.samples.length > 0 ? seed.samples : [emptySample()],
+        seed.samples.length > 0 ? seed.samples : [{ input: "", expected: "" }],
     );
 
     const [submitError, setSubmitError] = useState("");
@@ -396,58 +393,12 @@ export function ProblemForm({
                 </div>
             </section>
 
-            <section className="rounded-lg border border-white/[0.08] bg-[#141414] p-6 shadow-[0px_0px_0px_1px_rgba(255,255,255,0.08),rgba(0,0,0,0.04)_0px_2px_2px]">
-                <div className="flex items-center justify-between gap-4">
-                    <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
-                        Sample test cases
-                    </h2>
-                    <button
-                        type="button"
-                        onClick={() =>
-                            setSamples((s) => [...s, emptySample()])
-                        }
-                        className="rounded-md border border-white/[0.1] bg-white/[0.04] px-3 py-1.5 text-xs font-medium text-zinc-300 transition-colors hover:bg-white/[0.08]"
-                    >
-                        Add case
-                    </button>
-                </div>
-                <div className="mt-4 space-y-6">
-                    {samples.map((s, i) => (
-                        <div key={`s-${i}`} className="grid gap-3 md:grid-cols-2">
-                            <div>
-                                <label className={labelClass}>Input</label>
-                                <textarea
-                                    className={`${inputClass} min-h-[88px] resize-y font-mono text-xs`}
-                                    value={s.input}
-                                    onChange={(e) => {
-                                        const next = [...samples];
-                                        next[i] = {
-                                            ...next[i],
-                                            input: e.target.value,
-                                        };
-                                        setSamples(next);
-                                    }}
-                                />
-                            </div>
-                            <div>
-                                <label className={labelClass}>Expected</label>
-                                <textarea
-                                    className={`${inputClass} min-h-[88px] resize-y font-mono text-xs`}
-                                    value={s.expected}
-                                    onChange={(e) => {
-                                        const next = [...samples];
-                                        next[i] = {
-                                            ...next[i],
-                                            expected: e.target.value,
-                                        };
-                                        setSamples(next);
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            </section>
+            <TestCasesEditor
+                title="Sample test cases"
+                description="Shown to learners on the problem page so they can verify their solution before submitting."
+                value={samples}
+                onChange={setSamples}
+            />
 
             {submitError ? (
                 <p className="text-sm text-red-400">{submitError}</p>

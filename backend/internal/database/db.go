@@ -37,7 +37,9 @@ func NewPostgres(cfg *config.Config, log *zap.Logger) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	if err := db.AutoMigrate(&models.SampleTestCases{}); err != nil {
+	
+
+	if err := db.AutoMigrate(&models.TestCase{}); err != nil {
 		return nil, err
 	}
 

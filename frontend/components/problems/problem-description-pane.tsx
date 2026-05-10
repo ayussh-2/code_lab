@@ -92,11 +92,9 @@ export function ProblemDescriptionPane({
             {problem.constraints.length > 0 && (
               <div>
                 <h2 className="mb-2 text-sm font-semibold text-white">Constraints</h2>
-                <ul className="list-disc space-y-1 pl-5 font-mono text-xs text-zinc-400">
-                  {problem.constraints.map((constraint) => (
-                    <li key={constraint}>{constraint}</li>
-                  ))}
-                </ul>
+                <MarkdownKatexView
+                  markdown={problem.constraints.map((c) => `- ${c}`).join("\n")}
+                />
               </div>
             )}
           </div>

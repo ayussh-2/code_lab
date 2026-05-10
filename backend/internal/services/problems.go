@@ -83,7 +83,7 @@ type ProblemDetail struct {
 	Details         string                   `json:"details"`
 	Examples        []models.Example         `json:"examples"`
 	Constraints     []string                 `json:"constraints"`
-	SampleTestCases []models.SampleTestCases `json:"sample_test_cases"`
+	SampleTestCases []models.TestCase        `json:"sample_test_cases"`
 	CreatedAt       time.Time                `json:"created_at"`
 	UpdatedAt       time.Time                `json:"updated_at"`
 }
@@ -137,7 +137,10 @@ func (ps *ProblemService) ListProblems() ([]ProblemListItem, error) {
 
 func (ps *ProblemService) GetProblemBySlug(slug string) (*ProblemDetail, error) {
 	var problem models.Problems
-	err := ps.db.Preload("SampleTestCases").Where("slug = ?", slug).First(&problem).Error
+	err := ps.db.
+		Preload("TestCases", "kind = ?", models.TestCaseKindSample).
+		Where("slug = ?", slug).
+		First(&problem).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, utils.NewAppError(http.StatusNotFound, "problem not found", err)
@@ -157,7 +160,7 @@ func (ps *ProblemService) GetProblemBySlug(slug string) (*ProblemDetail, error) 
 		Details:         problem.Details,
 		Examples:        problem.Examples,
 		Constraints:     problem.Constraints,
-		SampleTestCases: problem.SampleTestCases,
+		SampleTestCases: problem.TestCases,
 		CreatedAt:       problem.CreatedAt,
 		UpdatedAt:       problem.UpdatedAt,
 	}
@@ -202,16 +205,18 @@ func (ps *ProblemService) UpdateProblemBySlug(slug string, p Problem) (*models.P
 			return utils.NewAppError(http.StatusInternalServerError, "cannot update problem", err)
 		}
 
-		if err := tx.Where("problem_id = ?", existing.ID).Delete(&models.SampleTestCases{}).Error; err != nil {
+		if err := tx.Where("problem_id = ? AND kind = ?", existing.ID, models.TestCaseKindSample).
+			Delete(&models.TestCase{}).Error; err != nil {
 			ps.log.Error("failed to clear sample test cases", zap.Error(err))
 			return utils.NewAppError(http.StatusInternalServerError, "cannot update problem", err)
 		}
 
 		if len(p.SampleTestCases) > 0 {
-			samples := make([]models.SampleTestCases, len(p.SampleTestCases))
+			samples := make([]models.TestCase, len(p.SampleTestCases))
 			for i := range p.SampleTestCases {
-				samples[i] = models.SampleTestCases{
+				samples[i] = models.TestCase{
 					ProblemID: existing.ID,
+					Kind:      models.TestCaseKindSample,
 					Input:     p.SampleTestCases[i].Input,
 					Expected:  p.SampleTestCases[i].Expected,
 				}
@@ -228,11 +233,88 @@ func (ps *ProblemService) UpdateProblemBySlug(slug string, p Problem) (*models.P
 	}
 
 	var refreshed models.Problems
-	if err := ps.db.Preload("SampleTestCases").Where("id = ?", existing.ID).First(&refreshed).Error; err != nil {
+	if err := ps.db.
+		Preload("TestCases", "kind = ?", models.TestCaseKindSample).
+		Where("id = ?", existing.ID).
+		First(&refreshed).Error; err != nil {
 		ps.log.Error("failed to reload problem after update", zap.Error(err))
 		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot update problem", err)
 	}
 	return &refreshed, nil
+}
+
+func (ps *ProblemService) ListHiddenTestCases(slug string) ([]models.TestCase, error) {
+	var existing models.Problems
+	if err := ps.db.Select("id").Where("slug = ?", slug).First(&existing).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, utils.NewAppError(http.StatusNotFound, "problem not found", err)
+		}
+		ps.log.Error("failed to fetch problem for hidden test cases", zap.Error(err))
+		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot fetch hidden test cases", err)
+	}
+
+	var cases []models.TestCase
+	if err := ps.db.
+		Where("problem_id = ? AND kind = ?", existing.ID, models.TestCaseKindHidden).
+		Order("id asc").
+		Find(&cases).Error; err != nil {
+		ps.log.Error("failed to list hidden test cases", zap.Error(err))
+		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot fetch hidden test cases", err)
+	}
+	return cases, nil
+}
+
+func (ps *ProblemService) ReplaceHiddenTestCases(slug string, items []SampleTestCases) ([]models.TestCase, error) {
+	var existing models.Problems
+	if err := ps.db.Select("id").Where("slug = ?", slug).First(&existing).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, utils.NewAppError(http.StatusNotFound, "problem not found", err)
+		}
+		ps.log.Error("failed to fetch problem for hidden test cases", zap.Error(err))
+		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot replace hidden test cases", err)
+	}
+
+	txErr := ps.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("problem_id = ? AND kind = ?", existing.ID, models.TestCaseKindHidden).
+			Delete(&models.TestCase{}).Error; err != nil {
+			ps.log.Error("failed to clear hidden test cases", zap.Error(err))
+			return utils.NewAppError(http.StatusInternalServerError, "cannot replace hidden test cases", err)
+		}
+
+		if len(items) == 0 {
+			return nil
+		}
+
+		hidden := make([]models.TestCase, 0, len(items))
+		for i := range items {
+			input := strings.TrimSpace(items[i].Input)
+			expected := strings.TrimSpace(items[i].Expected)
+			if input == "" || expected == "" {
+				continue
+			}
+			hidden = append(hidden, models.TestCase{
+				ProblemID: existing.ID,
+				Kind:      models.TestCaseKindHidden,
+				Input:     input,
+				Expected:  expected,
+			})
+		}
+
+		if len(hidden) == 0 {
+			return nil
+		}
+
+		if err := tx.Create(&hidden).Error; err != nil {
+			ps.log.Error("failed to insert hidden test cases", zap.Error(err))
+			return utils.NewAppError(http.StatusInternalServerError, "cannot replace hidden test cases", err)
+		}
+		return nil
+	})
+	if txErr != nil {
+		return nil, txErr
+	}
+
+	return ps.ListHiddenTestCases(slug)
 }
 
 func (ps *ProblemService) DeleteProblemBySlug(slug string) error {
@@ -372,10 +454,11 @@ func (ps *ProblemService) addProblemWithTx(db *gorm.DB, p Problem) (*models.Prob
 			return nil
 		}
 
-		sampleTestCases := make([]models.SampleTestCases, len(p.SampleTestCases))
+		sampleTestCases := make([]models.TestCase, len(p.SampleTestCases))
 		for i := range p.SampleTestCases {
-			sampleTestCases[i] = models.SampleTestCases{
+			sampleTestCases[i] = models.TestCase{
 				ProblemID: problem.ID,
+				Kind:      models.TestCaseKindSample,
 				Input:     p.SampleTestCases[i].Input,
 				Expected:  p.SampleTestCases[i].Expected,
 			}
@@ -386,7 +469,7 @@ func (ps *ProblemService) addProblemWithTx(db *gorm.DB, p Problem) (*models.Prob
 			return utils.NewAppError(http.StatusInternalServerError, "cannot create problem", err)
 		}
 
-		problem.SampleTestCases = sampleTestCases
+		problem.TestCases = sampleTestCases
 		return nil
 	})
 	if txErr != nil {

@@ -45,7 +45,10 @@ export default function SolveProblemPage() {
                     activeTab={activeTab}
                     onTabChange={setActiveTab}
                 />
-                <ProblemEditorPane backHref="/problems" />
+                <ProblemEditorPane
+                    backHref="/problems"
+                    samples={problem?.sample_test_cases ?? []}
+                />
             </main>
         </div>
     );
