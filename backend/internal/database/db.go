@@ -47,6 +47,14 @@ func NewPostgres(cfg *config.Config, log *zap.Logger) (*gorm.DB, error) {
 		return nil, err
 	}
 
+	if err := db.AutoMigrate(&models.Submission{}); err != nil {
+		return nil, err
+	}
+
+	if err := db.AutoMigrate(&models.SubmissionTestResult{}); err != nil {
+		return nil, err
+	}
+
 	log.Info("Connected to db and migrated!")
 	return db, nil
 }

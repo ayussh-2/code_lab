@@ -43,4 +43,3 @@ type TestCase struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-func (TestCase) TableName() string { return "test_cases" }
