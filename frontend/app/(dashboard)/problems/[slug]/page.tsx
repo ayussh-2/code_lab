@@ -44,9 +44,11 @@ export default function SolveProblemPage() {
                     errorMessage={errorMessage}
                     activeTab={activeTab}
                     onTabChange={setActiveTab}
+                    slug={params.slug}
                 />
                 <ProblemEditorPane
                     backHref="/problems"
+                    slug={params.slug}
                     samples={problem?.sample_test_cases ?? []}
                 />
             </main>

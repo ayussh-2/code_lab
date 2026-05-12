@@ -1,7 +1,9 @@
 package services
 
 import (
+	"context"
 	"net/http"
+	"time"
 
 	"github.com/ayussh-2/internal/utils"
 	"github.com/gin-gonic/gin"
@@ -9,18 +11,43 @@ import (
 )
 
 type HealthService struct {
-	log *zap.Logger
+	log    *zap.Logger
+	checks []DependencyCheck
 }
 
-func NewHealthService(log *zap.Logger) *HealthService {
-	return &HealthService{log: log}
+type DependencyCheck struct {
+	Name  string
+	Check func(context.Context) error
+}
+
+func NewHealthService(log *zap.Logger, checks []DependencyCheck) *HealthService {
+	return &HealthService{log: log, checks: checks}
 }
 
 func (h *HealthService) HealthCheck(c *gin.Context) {
-	h.log.Info("health check hit")
-	utils.Success(c, http.StatusOK, "service healthy", gin.H{"status": "ok"})
-}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+	defer cancel()
 
-func (h *HealthService) Home(c *gin.Context) {
-	utils.Success(c, http.StatusOK, "welcome", gin.H{"msg": "Welcome to something API"})
+	status := "ok"
+	httpStatus := http.StatusOK
+	dependencies := gin.H{}
+
+	for _, dep := range h.checks {
+		if err := dep.Check(ctx); err != nil {
+			status = "degraded"
+			httpStatus = http.StatusServiceUnavailable
+			dependencies[dep.Name] = gin.H{
+				"status": "down",
+				"error":  err.Error(),
+			}
+			continue
+		}
+		dependencies[dep.Name] = gin.H{"status": "ok"}
+	}
+
+	h.log.Info("health check hit", zap.String("status", status))
+	utils.Success(c, httpStatus, "service health", gin.H{
+		"status":       status,
+		"dependencies": dependencies,
+	})
 }

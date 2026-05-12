@@ -1,15 +1,13 @@
-// sentinel errors returned by the docker runner.
+// errors.go re-exports the shared sandbox sentinel errors so callers inside
+// the docker package can keep using the short names without an extra import.
+// The actual values live in the parent sandbox package so non-docker backends
+// can return the same errors.
 package docker
 
-import "errors"
+import "github.com/ayussh-2/internal/sandbox"
 
 var (
-
-	ErrUnknownLanguage = errors.New("unknown language")
-
-	
-	ErrCompileFailed = errors.New("compile failed")
-
-	
-	ErrCompileTimeout = errors.New("compile timed out")
+	ErrUnknownLanguage = sandbox.ErrUnknownLanguage
+	ErrCompileFailed   = sandbox.ErrCompileFailed
+	ErrCompileTimeout  = sandbox.ErrCompileTimeout
 )

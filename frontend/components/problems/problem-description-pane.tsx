@@ -5,6 +5,7 @@ import {
   PROBLEM_DETAIL_TABS,
   PROBLEM_DIFFICULTY_BADGE_CLASS,
 } from "./problem-shared";
+import { SubmissionsListPane } from "./submissions-list-pane";
 
 type ProblemTab = (typeof PROBLEM_DETAIL_TABS)[number];
 
@@ -14,6 +15,7 @@ interface ProblemDescriptionPaneProps {
   errorMessage: string;
   activeTab: ProblemTab;
   onTabChange: (tab: ProblemTab) => void;
+  slug: string;
 }
 
 export function ProblemDescriptionPane({
@@ -22,6 +24,7 @@ export function ProblemDescriptionPane({
   errorMessage,
   activeTab,
   onTabChange,
+  slug,
 }: ProblemDescriptionPaneProps) {
   return (
     <section className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-lg border border-white/8 bg-[#141414]">
@@ -42,7 +45,9 @@ export function ProblemDescriptionPane({
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
-        {isLoading ? (
+        {activeTab === "submissions" ? (
+          <SubmissionsListPane slug={slug} />
+        ) : isLoading ? (
           <LoadingState message="Loading problem..." />
         ) : errorMessage ? (
           <ErrorState message={errorMessage} />

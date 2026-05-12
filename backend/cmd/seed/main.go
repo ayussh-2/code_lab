@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"os"
 	"strings"
 
@@ -35,6 +36,9 @@ func ex(input, output, explanation string) services.Example {
 }
 
 func main() {
+	reset := flag.Bool("reset", false, "truncate problem-related tables before seeding")
+	flag.Parse()
+
 	cfg := config.LoadConfig()
 
 	log, err := logger.Init(cfg.Env)
@@ -46,6 +50,12 @@ func main() {
 	db, err := database.NewPostgres(cfg, log)
 	if err != nil {
 		log.Fatal("cannot connect to db", zap.Error(err))
+	}
+
+	if *reset {
+		if err := resetProblemData(db, log); err != nil {
+			log.Fatal("reset failed", zap.Error(err))
+		}
 	}
 
 	svc := services.NewProblemService(log, db, cfg)
@@ -111,6 +121,15 @@ func main() {
 	}
 
 	log.Info("seed complete", zap.Int("inserted", inserted), zap.Int("skipped", skipped))
+}
+
+// resetProblemData wipes everything tied to problems/judging but leaves users
+// and OTPs intact. Postgres TRUNCATE ... CASCADE handles FK fan-out for us.
+func resetProblemData(db *gorm.DB, log *zap.Logger) error {
+	log.Warn("reset flag set: truncating submission_test_results, submissions, test_cases, problems, topics")
+	return db.Exec(
+		"TRUNCATE submission_test_results, submissions, test_cases, problems, topics RESTART IDENTITY CASCADE",
+	).Error
 }
 
 func ensureTopics(db *gorm.DB, log *zap.Logger, problems []seedProblem) (map[string]uint, error) {
@@ -184,8 +203,42 @@ func slugify(title string) string {
 	return out
 }
 
+// ioFormat renders a consistent "Input / Output Format" markdown block that
+// gets appended to every problem's details. Keeps the contract identical
+// across the catalogue.
+func ioFormat(input, output string) string {
+	return "\n\n## Input / Output Format\n\n**Input**\n" + input + "\n\n**Output**\n" + output + "\n"
+}
+
 func seedData() []seedProblem {
 	return []seedProblem{
+		{
+			title:      "Echo Input",
+			difficulty: "easy",
+			topics:     []string{"Implementation"},
+			hints: []string{
+				"Read from stdin and print the same value.",
+			},
+			details: `## Statement
+
+Given a line of input, print it unchanged.` + ioFormat(
+				"- A single line of text.",
+				"- The exact same line.",
+			),
+			examples: []services.Example{
+				ex("hello", "hello", "The output matches the input."),
+			},
+			constraints: []string{
+				"Input length is at most 100 characters.",
+			},
+			samples: []services.SampleTestCases{
+				tc("hello\n", "hello\n"),
+			},
+			hidden: []services.SampleTestCases{
+				tc("world\n", "world\n"),
+				tc("42\n", "42\n"),
+			},
+		},
 		{
 			title:      "Two Sum",
 			difficulty: "easy",
@@ -198,10 +251,13 @@ func seedData() []seedProblem {
 
 Given an array of integers $nums$ and an integer $target$, return the **indices** of the two numbers that add up to $target$.
 
-You may assume each input has exactly one solution, and you may not use the same element twice.`,
+You may assume each input has exactly one solution, and you may not use the same element twice.` + ioFormat(
+				"- Line 1: two integers `n` and `target` separated by a space.\n- Line 2: `n` space-separated integers `nums[0] nums[1] ... nums[n-1]`.",
+				"- A single line with two space-separated 0-based indices `i j` such that `nums[i] + nums[j] == target`.",
+			),
 			examples: []services.Example{
-				ex("nums = [2,7,11,15], target = 9", "[0,1]", "nums[0] + nums[1] == 9"),
-				ex("nums = [3,2,4], target = 6", "[1,2]", "nums[1] + nums[2] == 6"),
+				ex("nums = [2,7,11,15], target = 9", "0 1", "nums[0] + nums[1] == 9"),
+				ex("nums = [3,2,4], target = 6", "1 2", "nums[1] + nums[2] == 6"),
 			},
 			constraints: []string{
 				"$2 \\le n \\le 10^4$",
@@ -209,13 +265,13 @@ You may assume each input has exactly one solution, and you may not use the same
 				"Only one valid answer exists.",
 			},
 			samples: []services.SampleTestCases{
-				tc("nums = [2,7,11,15]\ntarget = 9", "[0,1]"),
-				tc("nums = [3,2,4]\ntarget = 6", "[1,2]"),
+				tc("4 9\n2 7 11 15", "0 1"),
+				tc("3 6\n3 2 4", "1 2"),
 			},
 			hidden: []services.SampleTestCases{
-				tc("nums = [3,3]\ntarget = 6", "[0,1]"),
-				tc("nums = [-1,-2,-3,-4,-5]\ntarget = -8", "[2,4]"),
-				tc("nums = [0,4,3,0]\ntarget = 0", "[0,3]"),
+				tc("2 6\n3 3", "0 1"),
+				tc("5 -8\n-1 -2 -3 -4 -5", "2 4"),
+				tc("4 0\n0 4 3 0", "0 3"),
 			},
 		},
 		{
@@ -230,7 +286,10 @@ You may assume each input has exactly one solution, and you may not use the same
 
 Given a string $s$ containing only the characters $($, $)$, $\{$, $\}$, $[$, $]$, determine if it is **valid**.
 
-A string is valid if open brackets are closed by the same type of bracket and in the correct order.`,
+A string is valid if open brackets are closed by the same type of bracket and in the correct order.` + ioFormat(
+				"- A single line containing the string `s`. May be empty.",
+				"- `true` or `false` (lowercase).",
+			),
 			examples: []services.Example{
 				ex(`s = "()"`, "true", "Single matched pair."),
 				ex(`s = "(]"`, "false", "Mismatched bracket types."),
@@ -240,13 +299,13 @@ A string is valid if open brackets are closed by the same type of bracket and in
 				"$s$ consists only of bracket characters.",
 			},
 			samples: []services.SampleTestCases{
-				tc(`s = "()[]{}"`, "true"),
-				tc(`s = "([)]"`, "false"),
+				tc("()[]{}", "true"),
+				tc("([)]", "false"),
 			},
 			hidden: []services.SampleTestCases{
-				tc(`s = "{[]}"`, "true"),
-				tc(`s = "("`, "false"),
-				tc(`s = ""`, "true"),
+				tc("{[]}", "true"),
+				tc("(", "false"),
+				tc("", "true"),
 			},
 		},
 		{
@@ -259,22 +318,25 @@ A string is valid if open brackets are closed by the same type of bracket and in
 			},
 			details: `## Statement
 
-Given the $head$ of a singly linked list, reverse the list and return the new head.`,
+Given the $head$ of a singly linked list, reverse the list and return the new head.` + ioFormat(
+				"- Line 1: integer `n`, the number of nodes.\n- Line 2: `n` space-separated integer values from head to tail. May be empty when `n = 0`.",
+				"- A single line with the reversed values space-separated. Empty when the list is empty.",
+			),
 			examples: []services.Example{
-				ex("head = [1,2,3,4,5]", "[5,4,3,2,1]", "Reverse the order of nodes."),
+				ex("head = [1,2,3,4,5]", "5 4 3 2 1", "Reverse the order of nodes."),
 			},
 			constraints: []string{
 				"$0 \\le n \\le 5000$",
 				"$-5000 \\le \\text{Node.val} \\le 5000$",
 			},
 			samples: []services.SampleTestCases{
-				tc("head = [1,2,3,4,5]", "[5,4,3,2,1]"),
-				tc("head = [1,2]", "[2,1]"),
+				tc("5\n1 2 3 4 5", "5 4 3 2 1"),
+				tc("2\n1 2", "2 1"),
 			},
 			hidden: []services.SampleTestCases{
-				tc("head = []", "[]"),
-				tc("head = [7]", "[7]"),
-				tc("head = [1,1,2,2]", "[2,2,1,1]"),
+				tc("0\n", ""),
+				tc("1\n7", "7"),
+				tc("4\n1 1 2 2", "2 2 1 1"),
 			},
 		},
 		{
@@ -289,7 +351,10 @@ Given the $head$ of a singly linked list, reverse the list and return the new he
 
 Given an integer array $nums$, find the **contiguous** subarray with the largest sum and return its sum.
 
-This is also known as **Kadane's algorithm**.`,
+This is also known as **Kadane's algorithm**.` + ioFormat(
+				"- Line 1: integer `n`, the array length.\n- Line 2: `n` space-separated integers.",
+				"- A single integer: the maximum contiguous subarray sum.",
+			),
 			examples: []services.Example{
 				ex("nums = [-2,1,-3,4,-1,2,1,-5,4]", "6", "Subarray [4,-1,2,1] has sum 6."),
 			},
@@ -298,13 +363,13 @@ This is also known as **Kadane's algorithm**.`,
 				"$-10^4 \\le nums[i] \\le 10^4$",
 			},
 			samples: []services.SampleTestCases{
-				tc("nums = [-2,1,-3,4,-1,2,1,-5,4]", "6"),
-				tc("nums = [1]", "1"),
+				tc("9\n-2 1 -3 4 -1 2 1 -5 4", "6"),
+				tc("1\n1", "1"),
 			},
 			hidden: []services.SampleTestCases{
-				tc("nums = [5,4,-1,7,8]", "23"),
-				tc("nums = [-1,-2,-3,-4]", "-1"),
-				tc("nums = [0,0,0]", "0"),
+				tc("5\n5 4 -1 7 8", "23"),
+				tc("4\n-1 -2 -3 -4", "-1"),
+				tc("3\n0 0 0", "0"),
 			},
 		},
 		{
@@ -319,7 +384,10 @@ This is also known as **Kadane's algorithm**.`,
 
 You are climbing a staircase with $n$ steps. Each move you can climb $1$ or $2$ steps.
 
-Return the number of distinct ways to reach the top.`,
+Return the number of distinct ways to reach the top.` + ioFormat(
+				"- A single integer `n`.",
+				"- A single integer: the number of distinct ways to reach the top.",
+			),
 			examples: []services.Example{
 				ex("n = 2", "2", "1+1 or 2."),
 				ex("n = 3", "3", "1+1+1, 1+2, or 2+1."),
@@ -328,13 +396,13 @@ Return the number of distinct ways to reach the top.`,
 				"$1 \\le n \\le 45$",
 			},
 			samples: []services.SampleTestCases{
-				tc("n = 2", "2"),
-				tc("n = 3", "3"),
+				tc("2", "2"),
+				tc("3", "3"),
 			},
 			hidden: []services.SampleTestCases{
-				tc("n = 1", "1"),
-				tc("n = 5", "8"),
-				tc("n = 10", "89"),
+				tc("1", "1"),
+				tc("5", "8"),
+				tc("10", "89"),
 			},
 		},
 		{
@@ -349,7 +417,10 @@ Return the number of distinct ways to reach the top.`,
 
 Given a sorted array $nums$ and a value $target$, return the index of $target$ if present, otherwise return $-1$.
 
-Your algorithm must run in $O(\log n)$ time.`,
+Your algorithm must run in $O(\log n)$ time.` + ioFormat(
+				"- Line 1: two integers `n` and `target`.\n- Line 2: `n` space-separated integers in ascending order.",
+				"- A single integer: the 0-based index of `target`, or `-1` if not present.",
+			),
 			examples: []services.Example{
 				ex("nums = [-1,0,3,5,9,12], target = 9", "4", ""),
 				ex("nums = [-1,0,3,5,9,12], target = 2", "-1", ""),
@@ -360,13 +431,13 @@ Your algorithm must run in $O(\log n)$ time.`,
 				"All values are unique.",
 			},
 			samples: []services.SampleTestCases{
-				tc("nums = [-1,0,3,5,9,12]\ntarget = 9", "4"),
-				tc("nums = [-1,0,3,5,9,12]\ntarget = 2", "-1"),
+				tc("6 9\n-1 0 3 5 9 12", "4"),
+				tc("6 2\n-1 0 3 5 9 12", "-1"),
 			},
 			hidden: []services.SampleTestCases{
-				tc("nums = [5]\ntarget = 5", "0"),
-				tc("nums = [5]\ntarget = -3", "-1"),
-				tc("nums = [1,2,3,4,5,6,7,8,9,10]\ntarget = 1", "0"),
+				tc("1 5\n5", "0"),
+				tc("1 -3\n5", "-1"),
+				tc("10 1\n1 2 3 4 5 6 7 8 9 10", "0"),
 			},
 		},
 		{
@@ -381,7 +452,10 @@ Your algorithm must run in $O(\log n)$ time.`,
 
 You are given an array $prices$ where $prices[i]$ is the price of a stock on day $i$.
 
-Choose a single day to buy and a later day to sell so that profit is maximized. Return the maximum profit, or $0$ if no profit is achievable.`,
+Choose a single day to buy and a later day to sell so that profit is maximized. Return the maximum profit, or $0$ if no profit is achievable.` + ioFormat(
+				"- Line 1: integer `n`, the number of days.\n- Line 2: `n` space-separated integers, the daily prices.",
+				"- A single integer: the maximum profit (`0` if no profit is possible).",
+			),
 			examples: []services.Example{
 				ex("prices = [7,1,5,3,6,4]", "5", "Buy at 1 (day 2), sell at 6 (day 5)."),
 				ex("prices = [7,6,4,3,1]", "0", "Prices only fall."),
@@ -391,13 +465,13 @@ Choose a single day to buy and a later day to sell so that profit is maximized. 
 				"$0 \\le prices[i] \\le 10^4$",
 			},
 			samples: []services.SampleTestCases{
-				tc("prices = [7,1,5,3,6,4]", "5"),
-				tc("prices = [7,6,4,3,1]", "0"),
+				tc("6\n7 1 5 3 6 4", "5"),
+				tc("5\n7 6 4 3 1", "0"),
 			},
 			hidden: []services.SampleTestCases{
-				tc("prices = [1]", "0"),
-				tc("prices = [2,4,1]", "2"),
-				tc("prices = [3,2,6,5,0,3]", "4"),
+				tc("1\n1", "0"),
+				tc("3\n2 4 1", "2"),
+				tc("6\n3 2 6 5 0 3", "4"),
 			},
 		},
 		{
@@ -412,9 +486,12 @@ Choose a single day to buy and a later day to sell so that profit is maximized. 
 
 You are given the heads of two sorted linked lists $list1$ and $list2$.
 
-Merge them into a single sorted list and return its head.`,
+Merge them into a single sorted list and return its head.` + ioFormat(
+				"- Line 1: two integers `n1 n2`, the lengths of the two lists.\n- Line 2: `n1` space-separated integers (the first list). May be empty when `n1 = 0`.\n- Line 3: `n2` space-separated integers (the second list). May be empty when `n2 = 0`.",
+				"- A single line with the merged values space-separated. Empty when both lists are empty.",
+			),
 			examples: []services.Example{
-				ex("list1 = [1,2,4], list2 = [1,3,4]", "[1,1,2,3,4,4]", ""),
+				ex("list1 = [1,2,4], list2 = [1,3,4]", "1 1 2 3 4 4", ""),
 			},
 			constraints: []string{
 				"$0 \\le n_1, n_2 \\le 50$",
@@ -422,12 +499,12 @@ Merge them into a single sorted list and return its head.`,
 				"Both lists are sorted in non-decreasing order.",
 			},
 			samples: []services.SampleTestCases{
-				tc("list1 = [1,2,4]\nlist2 = [1,3,4]", "[1,1,2,3,4,4]"),
-				tc("list1 = []\nlist2 = []", "[]"),
+				tc("3 3\n1 2 4\n1 3 4", "1 1 2 3 4 4"),
+				tc("0 0\n\n", ""),
 			},
 			hidden: []services.SampleTestCases{
-				tc("list1 = []\nlist2 = [0]", "[0]"),
-				tc("list1 = [-2,3]\nlist2 = [-1,2]", "[-2,-1,2,3]"),
+				tc("0 1\n\n0", "0"),
+				tc("2 2\n-2 3\n-1 2", "-2 -1 2 3"),
 			},
 		},
 		{
@@ -439,7 +516,10 @@ Merge them into a single sorted list and return its head.`,
 			},
 			details: `## Statement
 
-Given an integer array $nums$, return $true$ if any value appears at least twice, and $false$ if every element is distinct.`,
+Given an integer array $nums$, return $true$ if any value appears at least twice, and $false$ if every element is distinct.` + ioFormat(
+				"- Line 1: integer `n`, the array length.\n- Line 2: `n` space-separated integers.",
+				"- `true` if any value appears more than once, otherwise `false`.",
+			),
 			examples: []services.Example{
 				ex("nums = [1,2,3,1]", "true", ""),
 				ex("nums = [1,2,3,4]", "false", ""),
@@ -449,12 +529,12 @@ Given an integer array $nums$, return $true$ if any value appears at least twice
 				"$-10^9 \\le nums[i] \\le 10^9$",
 			},
 			samples: []services.SampleTestCases{
-				tc("nums = [1,2,3,1]", "true"),
-				tc("nums = [1,2,3,4]", "false"),
+				tc("4\n1 2 3 1", "true"),
+				tc("4\n1 2 3 4", "false"),
 			},
 			hidden: []services.SampleTestCases{
-				tc("nums = [1,1,1,3,3,4,3,2,4,2]", "true"),
-				tc("nums = [0]", "false"),
+				tc("10\n1 1 1 3 3 4 3 2 4 2", "true"),
+				tc("1\n0", "false"),
 			},
 		},
 		{
@@ -469,22 +549,25 @@ Given an integer array $nums$, return $true$ if any value appears at least twice
 
 Given an integer array $nums$, move all $0$'s to the end while maintaining the relative order of the non-zero elements.
 
-You must do this **in place** without making a copy of the array.`,
+You must do this **in place** without making a copy of the array.` + ioFormat(
+				"- Line 1: integer `n`.\n- Line 2: `n` space-separated integers.",
+				"- A single line with the resulting array, space-separated.",
+			),
 			examples: []services.Example{
-				ex("nums = [0,1,0,3,12]", "[1,3,12,0,0]", ""),
+				ex("nums = [0,1,0,3,12]", "1 3 12 0 0", ""),
 			},
 			constraints: []string{
 				"$1 \\le n \\le 10^4$",
 				"$-2^{31} \\le nums[i] \\le 2^{31} - 1$",
 			},
 			samples: []services.SampleTestCases{
-				tc("nums = [0,1,0,3,12]", "[1,3,12,0,0]"),
-				tc("nums = [0]", "[0]"),
+				tc("5\n0 1 0 3 12", "1 3 12 0 0"),
+				tc("1\n0", "0"),
 			},
 			hidden: []services.SampleTestCases{
-				tc("nums = [1,0,1]", "[1,1,0]"),
-				tc("nums = [0,0,0,1]", "[1,0,0,0]"),
-				tc("nums = [4,2,4,0,0,3,0,5,1,0]", "[4,2,4,3,5,1,0,0,0,0]"),
+				tc("3\n1 0 1", "1 1 0"),
+				tc("4\n0 0 0 1", "1 0 0 0"),
+				tc("10\n4 2 4 0 0 3 0 5 1 0", "4 2 4 3 5 1 0 0 0 0"),
 			},
 		},
 		{
@@ -499,7 +582,10 @@ You must do this **in place** without making a copy of the array.`,
 
 Given two strings $s$ and $t$, return $true$ if $t$ is an anagram of $s$, and $false$ otherwise.
 
-An **anagram** uses exactly the same characters with the same frequencies, just rearranged.`,
+An **anagram** uses exactly the same characters with the same frequencies, just rearranged.` + ioFormat(
+				"- Line 1: the string `s`. May be empty.\n- Line 2: the string `t`. May be empty.",
+				"- `true` if `t` is an anagram of `s`, otherwise `false`.",
+			),
 			examples: []services.Example{
 				ex(`s = "anagram", t = "nagaram"`, "true", ""),
 				ex(`s = "rat", t = "car"`, "false", ""),
@@ -509,13 +595,13 @@ An **anagram** uses exactly the same characters with the same frequencies, just 
 				"$s$ and $t$ contain only lowercase English letters.",
 			},
 			samples: []services.SampleTestCases{
-				tc(`s = "anagram"` + "\n" + `t = "nagaram"`, "true"),
-				tc(`s = "rat"` + "\n" + `t = "car"`, "false"),
+				tc("anagram\nnagaram", "true"),
+				tc("rat\ncar", "false"),
 			},
 			hidden: []services.SampleTestCases{
-				tc(`s = "a"` + "\n" + `t = "ab"`, "false"),
-				tc(`s = "abc"` + "\n" + `t = "cba"`, "true"),
-				tc(`s = ""` + "\n" + `t = ""`, "true"),
+				tc("a\nab", "false"),
+				tc("abc\ncba", "true"),
+				tc("\n", "true"),
 			},
 		},
 		{
@@ -528,7 +614,10 @@ An **anagram** uses exactly the same characters with the same frequencies, just 
 			},
 			details: `## Statement
 
-Given a string $s$, find the length of the longest substring without repeating characters.`,
+Given a string $s$, find the length of the longest substring without repeating characters.` + ioFormat(
+				"- A single line containing the string `s`. May be empty.",
+				"- A single integer: the length of the longest substring without repeating characters.",
+			),
 			examples: []services.Example{
 				ex(`s = "abcabcbb"`, "3", `"abc" has length 3.`),
 				ex(`s = "bbbbb"`, "1", `"b" has length 1.`),
@@ -538,13 +627,13 @@ Given a string $s$, find the length of the longest substring without repeating c
 				"$s$ consists of English letters, digits, symbols, and spaces.",
 			},
 			samples: []services.SampleTestCases{
-				tc(`s = "abcabcbb"`, "3"),
-				tc(`s = "pwwkew"`, "3"),
+				tc("abcabcbb", "3"),
+				tc("pwwkew", "3"),
 			},
 			hidden: []services.SampleTestCases{
-				tc(`s = ""`, "0"),
-				tc(`s = " "`, "1"),
-				tc(`s = "dvdf"`, "3"),
+				tc("", "0"),
+				tc(" ", "1"),
+				tc("dvdf", "3"),
 			},
 		},
 	}

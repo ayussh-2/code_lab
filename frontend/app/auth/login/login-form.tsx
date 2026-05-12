@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ApiError } from "@/lib/api";
 import { login } from "@/lib/auth";
 import {
@@ -15,6 +15,7 @@ import { SocialLoginButtons } from "@/components/auth/social-login-buttons";
 
 export function LoginForm() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +28,7 @@ export function LoginForm() {
 
         try {
             await login({ email, password });
-            router.push("/problems");
+            router.push(getSafeRedirect(searchParams.get("from")));
         } catch (error) {
             if (error instanceof ApiError) {
                 if (error.status === 403 && /not verified/i.test(error.message)) {
@@ -102,4 +103,11 @@ export function LoginForm() {
             <SocialLoginButtons />
         </>
     );
+}
+
+function getSafeRedirect(from: string | null): string {
+    if (!from || !from.startsWith("/") || from.startsWith("//")) {
+        return "/problems";
+    }
+    return from;
 }
