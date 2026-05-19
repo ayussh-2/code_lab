@@ -4,6 +4,10 @@ export interface User {
   id: number;
   name: string;
   email: string;
+  username: string;
+  avatar_url: string;
+  bio: string;
+  rating: number;
   role: string;
 }
 

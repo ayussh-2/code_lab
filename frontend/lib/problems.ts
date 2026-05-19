@@ -4,12 +4,22 @@ import {
     getFrontendQuestionBySlug,
 } from "@/lib/frontend-questions";
 
+export type ProblemStatus = "solved" | "unsolved" | "attempted";
+
 export interface ProblemListItem {
   id: number;
   title: string;
   slug: string;
   difficulty: "easy" | "medium" | "hard";
   topics: string[];
+  acceptance_rate: number;
+  status?: ProblemStatus;
+}
+
+export interface ProblemListFilters {
+  difficulty?: string;
+  topic?: number;
+  status?: ProblemStatus;
 }
 
 export interface ProblemDetail {
@@ -32,6 +42,10 @@ export interface ProblemDetail {
     input: string;
     expected: string;
   }>;
+  acceptance_rate: number;
+  editorial_unlocked: boolean;
+  editorial?: string;
+  status?: ProblemStatus;
 }
 
 function matchesSearch(item: ProblemListItem, query: string): boolean {
@@ -44,9 +58,26 @@ function matchesSearch(item: ProblemListItem, query: string): boolean {
   );
 }
 
-export async function getProblems(searchTerm = "") {
+function buildQuery(
+  searchTerm: string,
+  filters?: ProblemListFilters,
+): string {
+  const params = new URLSearchParams();
   const query = searchTerm.trim();
-  const params = query ? `?search=${encodeURIComponent(query)}` : "";
+  if (query) params.set("search", query);
+  if (filters?.difficulty) params.set("difficulty", filters.difficulty);
+  if (filters?.topic) params.set("topic", String(filters.topic));
+  if (filters?.status) params.set("status", filters.status);
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
+export async function getProblems(
+  searchTerm = "",
+  filters?: ProblemListFilters,
+) {
+  const query = searchTerm.trim();
+  const params = buildQuery(query, filters);
   const result = await apiRequest<ProblemListItem[]>(`/problems${params}`);
 
   const hardcoded = frontendQuestionsAsListItems().filter((item) =>
@@ -82,6 +113,7 @@ export interface CreateProblemPayload {
   topics: number[];
   hints: string[];
   details: string;
+  editorial?: string;
   examples: Array<{
     input: string;
     output: string;

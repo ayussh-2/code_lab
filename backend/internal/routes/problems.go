@@ -15,9 +15,9 @@ func ProblemRoutes(router *gin.RouterGroup, log *zap.Logger, db *gorm.DB, cfg *c
 	controller := controllers.NewProblemController(log, svc)
 
 	problem := router.Group("/problems")
-	problem.GET("", controller.ListProblems)
 	problem.GET("/topics", controller.ListTopics)
-	problem.GET("/:slug", controller.GetProblemBySlug)
+	problem.GET("", middlewares.OptionalAuthMiddleware(cfg), controller.ListProblems)
+	problem.GET("/:slug", middlewares.OptionalAuthMiddleware(cfg), controller.GetProblemBySlug)
 
 	protected := problem.Group("")
 	protected.Use(middlewares.AuthMiddleware(cfg), middlewares.RequireRoles("admin", "problem_setter"))

@@ -87,7 +87,11 @@ export function ProfileMenu() {
                     </div>
                     <div className="py-1">
                         <Link
-                            href="/profile"
+                            href={
+                                user.username
+                                    ? `/u/${user.username}`
+                                    : "/profile"
+                            }
                             onClick={() => setOpen(false)}
                             className="block px-3 py-2 text-sm text-zinc-300 transition-colors hover:bg-white/[0.04] hover:text-white"
                             role="menuitem"

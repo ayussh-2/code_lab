@@ -16,6 +16,12 @@ interface ProblemsListTableProps {
     onSearchChange: (value: string) => void;
 }
 
+const STATUS_CLASS: Record<string, string> = {
+    solved: "text-[#1cbf73]",
+    attempted: "text-[#e8a24a]",
+    unsolved: "text-zinc-600",
+};
+
 export function ProblemsListTable({
     problems,
     isLoading,
@@ -39,9 +45,11 @@ export function ProblemsListTable({
                 />
             </div>
 
-            <div className="grid grid-cols-[70px_1fr_90px] items-center gap-4 border-b border-white/8 bg-[#1a1a1a] px-6 py-3 text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
+            <div className="grid grid-cols-[70px_1fr_72px_72px_90px] items-center gap-4 border-b border-white/8 bg-[#1a1a1a] px-6 py-3 text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
                 <div>SL</div>
                 <div>Title</div>
+                <div className="text-right">Accept</div>
+                <div className="text-right">Status</div>
                 <div className="text-right">Difficulty</div>
             </div>
 
@@ -56,7 +64,7 @@ export function ProblemsListTable({
                 problems.map((problem, index) => (
                     <Link
                         key={problem.id}
-                        className="grid grid-cols-[70px_1fr_90px] items-center gap-4 border-b border-white/6 px-6 py-3.5 text-sm last:border-b-0 hover:bg-white/3"
+                        className="grid grid-cols-[70px_1fr_72px_72px_90px] items-center gap-4 border-b border-white/6 px-6 py-3.5 text-sm last:border-b-0 hover:bg-white/3"
                         href={getProblemHref(problem)}
                     >
                         <div className="text-xs font-mono text-zinc-500">
@@ -71,6 +79,14 @@ export function ProblemsListTable({
                                     <Chip key={tag}>{tag}</Chip>
                                 ))}
                             </div>
+                        </div>
+                        <div className="text-right font-mono text-xs text-zinc-400">
+                            {Math.round((problem.acceptance_rate ?? 0) * 1000) / 10}%
+                        </div>
+                        <div
+                            className={`text-right text-xs capitalize ${STATUS_CLASS[problem.status ?? "unsolved"] ?? "text-zinc-600"}`}
+                        >
+                            {problem.status ?? "-"}
                         </div>
                         <div
                             className={`text-right font-mono text-xs ${PROBLEM_DIFFICULTY_TEXT_CLASS[problem.difficulty.toLowerCase()]}`}

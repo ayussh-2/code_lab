@@ -29,8 +29,7 @@ export const PROBLEM_DIFFICULTY_BADGE_CLASS: Record<string, string> = {
 
 export const PROBLEM_DETAIL_TABS = [
     "description",
-    // "editorial",
-    // "solutions",
+    "editorial",
     "submissions",
 ] as const;
 

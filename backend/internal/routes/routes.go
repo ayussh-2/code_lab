@@ -16,4 +16,5 @@ func RegisterRoutes(server *gin.Engine, log *zap.Logger, db *gorm.DB, cfg *confi
 	AuthRoutes(api, log, db, cfg)
 	ProblemRoutes(api, log, db, cfg)
 	SubmissionRoutes(api, log, db, cfg, runner, queueClient)
+	UserRoutes(api, log, db, cfg)
 }

@@ -23,6 +23,9 @@ type Problems struct {
 	Details     string     `gorm:"type:text" json:"details"`
 	Examples    []Example  `gorm:"type:jsonb;serializer:json;not null;default:'[]'" json:"examples"`
 	Constraints []string   `gorm:"type:jsonb;serializer:json;not null;default:'[]'" json:"constraints"`
+	Editorial   string     `gorm:"type:text" json:"editorial"`
+	SubmitCount int64      `gorm:"not null;default:0" json:"submit_count"`
+	ACCount     int64      `gorm:"not null;default:0" json:"ac_count"`
 	TestCases   []TestCase `gorm:"foreignKey:ProblemID;constraint:OnDelete:CASCADE" json:"test_cases"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`

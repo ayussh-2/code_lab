@@ -26,6 +26,7 @@ export interface ProblemFormInitialValues {
     topicIds: number[];
     hints: string[];
     details: string;
+    editorial: string;
     examples: Array<{ input: string; output: string; explanation: string }>;
     constraints: string[];
     samples: Array<{ input: string; expected: string }>;
@@ -56,6 +57,7 @@ function defaults(): ProblemFormInitialValues {
         topicIds: [],
         hints: [""],
         details: DEFAULT_DETAILS,
+        editorial: "",
         examples: [emptyExample()],
         constraints: [""],
         samples: [{ input: "", expected: "" }],
@@ -85,6 +87,7 @@ export function ProblemForm({
         seed.hints.length > 0 ? seed.hints : [""],
     );
     const [details, setDetails] = useState(seed.details);
+    const [editorial, setEditorial] = useState(seed.editorial);
     const [examples, setExamples] = useState(
         seed.examples.length > 0 ? seed.examples : [emptyExample()],
     );
@@ -164,6 +167,7 @@ export function ProblemForm({
                 topics: selectedTopicIds,
                 hints: trimmedHints,
                 details: details.trim(),
+                editorial: editorial.trim(),
                 examples: filledExamples,
                 constraints: trimmedConstraints,
                 sample_test_cases: filledSamples,
@@ -261,6 +265,18 @@ export function ProblemForm({
                     <ProblemMarkdownEditor
                         value={details}
                         onChange={setDetails}
+                    />
+                </div>
+            </section>
+
+            <section className="rounded-lg border border-white/[0.08] bg-[#141414] p-6 shadow-[0px_0px_0px_1px_rgba(255,255,255,0.08),rgba(0,0,0,0.04)_0px_2px_2px]">
+                <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-500">
+                    Editorial (locked until solved)
+                </h2>
+                <div className="mt-6">
+                    <ProblemMarkdownEditor
+                        value={editorial}
+                        onChange={setEditorial}
                     />
                 </div>
             </section>

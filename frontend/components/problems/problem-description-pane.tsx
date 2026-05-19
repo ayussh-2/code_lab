@@ -47,6 +47,18 @@ export function ProblemDescriptionPane({
       <div className="flex-1 overflow-y-auto p-6">
         {activeTab === "submissions" ? (
           <SubmissionsListPane slug={slug} />
+        ) : activeTab === "editorial" ? (
+          isLoading ? (
+            <LoadingState message="Loading problem..." />
+          ) : errorMessage ? (
+            <ErrorState message={errorMessage} />
+          ) : problem?.editorial_unlocked ? (
+            <MarkdownKatexView markdown={problem.editorial || "_No editorial yet._"} />
+          ) : (
+            <div className="rounded-md border border-white/8 bg-[#1a1a1a] p-4 text-sm text-zinc-400">
+              Solve this problem to unlock the editorial.
+            </div>
+          )
         ) : isLoading ? (
           <LoadingState message="Loading problem..." />
         ) : errorMessage ? (

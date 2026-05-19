@@ -32,10 +32,14 @@ type AuthService struct {
 	cfg *config.Config
 }
 type UserResponse struct {
-	ID    uint   `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
-	Role  string `json:"role"`
+	ID        uint   `json:"id"`
+	Name      string `json:"name"`
+	Email     string `json:"email"`
+	Username  string `json:"username"`
+	AvatarURL string `json:"avatar_url"`
+	Bio       string `json:"bio"`
+	Rating    int    `json:"rating"`
+	Role      string `json:"role"`
 }
 
 type LoginInput struct {
@@ -126,12 +130,10 @@ func (a *AuthService) RegisterUser(input RegisterUserInput) (*UserResponse, erro
 		return nil, err
 	}
 
-	return &UserResponse{
-		ID:    user.ID,
-		Name:  user.Name,
-		Email: user.Email,
-		Role:  user.Role,
-	}, nil
+	a.ensureProfileDefaults(&user)
+
+	resp := a.userResponse(&user)
+	return &resp, nil
 }
 
 func (a *AuthService) RegisterGoogleUser(input GoogleSignupInput) (*UserResponse, error) {
@@ -160,13 +162,9 @@ func (a *AuthService) RegisterGoogleUser(input GoogleSignupInput) (*UserResponse
 		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot create user", err)
 	}
 
-	resp := UserResponse{
-		ID:    user.ID,
-		Name:  user.Name,
-		Email: user.Email,
-		Role:  user.Role,
-	}
+	a.ensureProfileDefaults(&user)
 
+	resp := a.userResponse(&user)
 	return &resp, nil
 }
 
@@ -227,14 +225,11 @@ func (a *AuthService) Login(input LoginInput, callbackEmail string, callbackName
 		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot login", err)
 	}
 
+	a.ensureProfileDefaults(&user)
+
 	return &LoginResult{
 		Response: LoginResponse{
-			User: UserResponse{
-				ID:    user.ID,
-				Name:  user.Name,
-				Email: user.Email,
-				Role:  user.Role,
-			},
+			User: a.userResponse(&user),
 		},
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
@@ -282,14 +277,11 @@ func (a *AuthService) Refresh(refreshToken string) (*RefreshResult, error) {
 		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot refresh token", err)
 	}
 
+	a.ensureProfileDefaults(&user)
+
 	return &RefreshResult{
 		Response: RefreshResponse{
-			User: UserResponse{
-				ID:    user.ID,
-				Name:  user.Name,
-				Email: user.Email,
-				Role:  user.Role,
-			},
+			User: a.userResponse(&user),
 		},
 		AccessToken:  accessToken,
 		RefreshToken: newRefreshToken,
@@ -347,12 +339,36 @@ func (a *AuthService) GetUserByID(id uint) (*UserResponse, error) {
 		a.log.Error("failed to fetch user", zap.Error(err))
 		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot fetch user", err)
 	}
-	return &UserResponse{
-		ID:    user.ID,
-		Name:  user.Name,
-		Email: user.Email,
-		Role:  user.Role,
-	}, nil
+	a.ensureProfileDefaults(&user)
+	resp := a.userResponse(&user)
+	return &resp, nil
+}
+
+func (a *AuthService) userResponse(user *models.User) UserResponse {
+	return UserResponse{
+		ID:        user.ID,
+		Name:      user.Name,
+		Email:     user.Email,
+		Username:  user.Username,
+		AvatarURL: user.AvatarURL,
+		Bio:       user.Bio,
+		Rating:    user.Rating,
+		Role:      user.Role,
+	}
+}
+
+func (a *AuthService) ensureProfileDefaults(user *models.User) {
+	userSvc := NewUserService(a.log, a.db, a.cfg)
+	if err := userSvc.EnsureUsername(user); err != nil {
+		a.log.Warn("failed to ensure username", zap.Error(err), zap.Uint("user_id", user.ID))
+		return
+	}
+	_ = a.db.First(user, user.ID).Error
+	if user.Rating == 0 {
+		user.Rating = 1500
+		_ = a.db.Model(user).Update("rating", 1500).Error
+	}
+	_ = userSvc.SeedInitialRatingHistory(user.ID, user.Rating, user.CreatedAt)
 }
 
 

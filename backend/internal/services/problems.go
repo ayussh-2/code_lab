@@ -57,6 +57,7 @@ type Problem struct {
 	Topics          []uint
 	Hint            []string
 	Details         string
+	Editorial       string
 	Examples        []Example
 	Constraints     []string
 	SampleTestCases []SampleTestCases
@@ -65,27 +66,40 @@ type Problem struct {
 }
 
 type ProblemListItem struct {
-	ID         uint     `json:"id"`
-	Title      string   `json:"title"`
-	Slug       string   `json:"slug"`
-	Difficulty string   `json:"difficulty"`
-	Topics     []string `json:"topics"`
+	ID             uint     `json:"id"`
+	Title          string   `json:"title"`
+	Slug           string   `json:"slug"`
+	Difficulty     string   `json:"difficulty"`
+	Topics         []string `json:"topics"`
+	AcceptanceRate float64  `json:"acceptance_rate"`
+	Status         string   `json:"status,omitempty"`
+}
+
+type ProblemListFilters struct {
+	Difficulty string
+	TopicID    uint
+	Status     string
+	UserID     uint
 }
 
 type ProblemDetail struct {
-	ID              uint                     `json:"id"`
-	Title           string                   `json:"title"`
-	Slug            string                   `json:"slug"`
-	Difficulty      string                   `json:"difficulty"`
-	Topics          []string                 `json:"topics"`
-	TopicIDs        []uint                   `json:"topic_ids"`
-	Hint            []string                 `json:"hints"`
-	Details         string                   `json:"details"`
-	Examples        []models.Example         `json:"examples"`
-	Constraints     []string                 `json:"constraints"`
-	SampleTestCases []models.TestCase        `json:"sample_test_cases"`
-	CreatedAt       time.Time                `json:"created_at"`
-	UpdatedAt       time.Time                `json:"updated_at"`
+	ID                uint              `json:"id"`
+	Title             string            `json:"title"`
+	Slug              string            `json:"slug"`
+	Difficulty        string            `json:"difficulty"`
+	Topics            []string          `json:"topics"`
+	TopicIDs          []uint            `json:"topic_ids"`
+	Hint              []string          `json:"hints"`
+	Details           string            `json:"details"`
+	Examples          []models.Example  `json:"examples"`
+	Constraints       []string          `json:"constraints"`
+	SampleTestCases   []models.TestCase `json:"sample_test_cases"`
+	AcceptanceRate    float64           `json:"acceptance_rate"`
+	EditorialUnlocked bool              `json:"editorial_unlocked"`
+	Editorial         string            `json:"editorial,omitempty"`
+	Status            string            `json:"status,omitempty"`
+	CreatedAt         time.Time         `json:"created_at"`
+	UpdatedAt         time.Time         `json:"updated_at"`
 }
 
 func (ps *ProblemService) AddProblem(p Problem) (*models.Problems, error) {
@@ -115,27 +129,48 @@ func (ps *ProblemService) AddProblemsBulk(items []Problem) ([]models.Problems, e
 	return created, nil
 }
 
-func (ps *ProblemService) ListProblems() ([]ProblemListItem, error) {
+func (ps *ProblemService) ListProblems(filters ProblemListFilters) ([]ProblemListItem, error) {
+	q := ps.db.Model(&models.Problems{}).Select("id", "title", "slug", "difficulty", "topics", "submit_count", "ac_count")
+
+	if d := strings.ToLower(strings.TrimSpace(filters.Difficulty)); d != "" {
+		q = q.Where("difficulty = ?", d)
+	}
+
+	if filters.TopicID > 0 {
+		q = q.Where("topics @> ?", fmt.Sprintf("[%d]", filters.TopicID))
+	}
+
 	var problems []models.Problems
-	if err := ps.db.Select("id", "title", "slug", "difficulty", "topics").Order("created_at desc").Find(&problems).Error; err != nil {
+	if err := q.Order("created_at desc").Find(&problems).Error; err != nil {
 		ps.log.Error("failed to list problems", zap.Error(err))
 		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot list problems", err)
 	}
 
+	statusByProblem := map[uint]string{}
+	if filters.UserID > 0 {
+		statusByProblem = ps.userProblemStatuses(filters.UserID)
+	}
+
 	resp := make([]ProblemListItem, 0, len(problems))
 	for i := range problems {
+		status := statusByProblem[problems[i].ID]
+		if filters.Status != "" && status != filters.Status {
+			continue
+		}
 		resp = append(resp, ProblemListItem{
-			ID:         problems[i].ID,
-			Title:      problems[i].Title,
-			Slug:       problems[i].Slug,
-			Difficulty: problems[i].Difficulty,
-			Topics:     ps.topicNamesByIDs(problems[i].Topics),
+			ID:             problems[i].ID,
+			Title:          problems[i].Title,
+			Slug:           problems[i].Slug,
+			Difficulty:     problems[i].Difficulty,
+			Topics:         ps.topicNamesByIDs(problems[i].Topics),
+			AcceptanceRate: problemAcceptanceRate(problems[i].ACCount, problems[i].SubmitCount),
+			Status:         status,
 		})
 	}
 	return resp, nil
 }
 
-func (ps *ProblemService) GetProblemBySlug(slug string) (*ProblemDetail, error) {
+func (ps *ProblemService) GetProblemBySlug(slug string, viewer UserViewer) (*ProblemDetail, error) {
 	var problem models.Problems
 	err := ps.db.
 		Preload("TestCases", "kind = ?", models.TestCaseKindSample).
@@ -149,23 +184,38 @@ func (ps *ProblemService) GetProblemBySlug(slug string) (*ProblemDetail, error) 
 		return nil, utils.NewAppError(http.StatusInternalServerError, "cannot fetch problem", err)
 	}
 
+	unlocked := ps.editorialUnlocked(viewer, problem.ID)
 	resp := ProblemDetail{
-		ID:              problem.ID,
-		Title:           problem.Title,
-		Slug:            problem.Slug,
-		Difficulty:      problem.Difficulty,
-		Topics:          ps.topicNamesByIDs(problem.Topics),
-		TopicIDs:        problem.Topics,
-		Hint:            problem.Hint,
-		Details:         problem.Details,
-		Examples:        problem.Examples,
-		Constraints:     problem.Constraints,
-		SampleTestCases: problem.TestCases,
-		CreatedAt:       problem.CreatedAt,
-		UpdatedAt:       problem.UpdatedAt,
+		ID:                problem.ID,
+		Title:             problem.Title,
+		Slug:              problem.Slug,
+		Difficulty:        problem.Difficulty,
+		Topics:            ps.topicNamesByIDs(problem.Topics),
+		TopicIDs:          problem.Topics,
+		Hint:              problem.Hint,
+		Details:           problem.Details,
+		Examples:          problem.Examples,
+		Constraints:       problem.Constraints,
+		SampleTestCases:   problem.TestCases,
+		AcceptanceRate:    problemAcceptanceRate(problem.ACCount, problem.SubmitCount),
+		EditorialUnlocked: unlocked,
+		CreatedAt:         problem.CreatedAt,
+		UpdatedAt:         problem.UpdatedAt,
+	}
+	if unlocked {
+		resp.Editorial = problem.Editorial
+	}
+	if viewer.UserID > 0 {
+		statuses := ps.userProblemStatuses(viewer.UserID)
+		resp.Status = statuses[problem.ID]
 	}
 
 	return &resp, nil
+}
+
+type UserViewer struct {
+	UserID uint
+	Role   string
 }
 
 func (ps *ProblemService) UpdateProblemBySlug(slug string, p Problem) (*models.Problems, error) {
@@ -196,10 +246,11 @@ func (ps *ProblemService) UpdateProblemBySlug(slug string, p Problem) (*models.P
 			Details:     p.Details,
 			Examples:    examples,
 			Constraints: p.Constraints,
+			Editorial:   p.Editorial,
 		}
 		if err := tx.Model(&models.Problems{}).
 			Where("id = ?", existing.ID).
-			Select("Title", "Difficulty", "Topics", "Hint", "Details", "Examples", "Constraints").
+			Select("Title", "Difficulty", "Topics", "Hint", "Details", "Examples", "Constraints", "Editorial").
 			Updates(&patch).Error; err != nil {
 			ps.log.Error("failed to update problem", zap.Error(err))
 			return utils.NewAppError(http.StatusInternalServerError, "cannot update problem", err)
@@ -433,6 +484,7 @@ func (ps *ProblemService) addProblemWithTx(db *gorm.DB, p Problem) (*models.Prob
 		Topics:      p.Topics,
 		Hint:        p.Hint,
 		Details:     p.Details,
+		Editorial:   p.Editorial,
 		Examples:    examples,
 		Constraints: p.Constraints,
 	}
@@ -532,4 +584,64 @@ func (ps *ProblemService) topicNamesByIDs(ids []uint) []string {
 	}
 
 	return names
+}
+
+func (ps *ProblemService) IncrementSubmissionStats(problemID uint, verdict string) error {
+	updates := map[string]any{"submit_count": gorm.Expr("submit_count + 1")}
+	if verdict == models.VerdictAC {
+		updates["ac_count"] = gorm.Expr("ac_count + 1")
+	}
+	return ps.db.Model(&models.Problems{}).Where("id = ?", problemID).Updates(updates).Error
+}
+
+func (ps *ProblemService) editorialUnlocked(viewer UserViewer, problemID uint) bool {
+	if viewer.Role == "admin" || viewer.Role == "problem_setter" {
+		return true
+	}
+	if viewer.UserID == 0 {
+		return false
+	}
+	var count int64
+	err := ps.db.Model(&models.Submission{}).
+		Where("user_id = ? AND problem_id = ? AND kind = ? AND verdict = ?",
+			viewer.UserID, problemID, models.SubmissionKindSubmit, models.VerdictAC).
+		Count(&count).Error
+	return err == nil && count > 0
+}
+
+func (ps *ProblemService) userProblemStatuses(userID uint) map[uint]string {
+	statusByProblem := map[uint]string{}
+
+	type row struct {
+		ProblemID uint
+		Verdict   string
+	}
+	var rows []row
+	if err := ps.db.Model(&models.Submission{}).
+		Select("problem_id, verdict").
+		Where("user_id = ? AND kind = ?", userID, models.SubmissionKindSubmit).
+		Order("id asc").
+		Find(&rows).Error; err != nil {
+		ps.log.Error("failed to load user problem statuses", zap.Error(err))
+		return statusByProblem
+	}
+
+	for _, r := range rows {
+		if r.Verdict == models.VerdictAC {
+			statusByProblem[r.ProblemID] = "solved"
+			continue
+		}
+		if statusByProblem[r.ProblemID] != "solved" {
+			statusByProblem[r.ProblemID] = "attempted"
+		}
+	}
+
+	return statusByProblem
+}
+
+func problemAcceptanceRate(acCount, submitCount int64) float64 {
+	if submitCount == 0 {
+		return 0
+	}
+	return float64(acCount) / float64(submitCount)
 }

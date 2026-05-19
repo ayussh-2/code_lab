@@ -22,6 +22,7 @@ function toFormValues(p: ProblemDetail): ProblemFormInitialValues {
         topicIds: p.topic_ids ?? [],
         hints: p.hints.length > 0 ? p.hints : [""],
         details: p.details,
+        editorial: p.editorial ?? "",
         examples:
             p.examples.length > 0
                 ? p.examples

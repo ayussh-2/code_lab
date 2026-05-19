@@ -332,7 +332,7 @@ func (ac *AuthController) HandleGoogleCallback(c *gin.Context) {
 		utils.Fail(c, http.StatusInternalServerError, "failed to decode user info")
 		return
 	}
-
+	print(resp.Body)
 	email, ok := userInfo["email"].(string)
 	if !ok || email == "" {
 		utils.Fail(c, http.StatusUnauthorized, "google account email not found")

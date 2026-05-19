@@ -379,7 +379,29 @@ func (s *SubmissionService) finalize(sub *models.Submission, verdict, internalEr
 		s.log.Error("judge: failed to finalize", zap.Error(err), zap.Uint("submission_id", sub.ID))
 		return err
 	}
+	s.afterSubmitFinalize(sub, verdict)
 	return nil
+}
+
+func (s *SubmissionService) afterSubmitFinalize(sub *models.Submission, verdict string) {
+	if sub.Kind != models.SubmissionKindSubmit {
+		return
+	}
+
+	updates := map[string]any{"submit_count": gorm.Expr("submit_count + 1")}
+	if verdict == models.VerdictAC {
+		updates["ac_count"] = gorm.Expr("ac_count + 1")
+	}
+	if err := s.db.Model(&models.Problems{}).Where("id = ?", sub.ProblemID).Updates(updates).Error; err != nil {
+		s.log.Error("judge: failed to update problem stats", zap.Error(err), zap.Uint("problem_id", sub.ProblemID))
+	}
+
+	if verdict == models.VerdictAC {
+		userSvc := NewUserService(s.log, s.db, s.cfg)
+		if err := userSvc.RecordRatingOnFirstAC(sub.UserID, sub.ProblemID); err != nil {
+			s.log.Error("judge: failed to record rating", zap.Error(err), zap.Uint("user_id", sub.UserID))
+		}
+	}
 }
 
 func (s *SubmissionService) MarkInternalError(submissionID uint, message string) error {

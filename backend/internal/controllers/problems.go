@@ -3,6 +3,8 @@ package controllers
 import (
 	"errors"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/ayussh-2/internal/services"
 	"github.com/ayussh-2/internal/utils"
@@ -21,6 +23,7 @@ type CreateProblemRequest struct {
 	Topics          []uint                     `json:"topics" binding:"required,min=1"`
 	Hint            []string                   `json:"hints" binding:"required,min=1"`
 	Details         string                     `json:"details" binding:"required"`
+	Editorial       string                     `json:"editorial"`
 	Examples        []services.Example         `json:"examples" binding:"required,min=1"`
 	Constraints     []string                  `json:"constraints" binding:"required,min=1"`
 	SampleTestCases []services.SampleTestCases `json:"sample_test_cases" binding:"required,min=1"`
@@ -59,6 +62,7 @@ func (pc *ProblemController) CreateProblem(c *gin.Context) {
 		Topics:          req.Topics,
 		Hint:            req.Hint,
 		Details:         req.Details,
+		Editorial:       req.Editorial,
 		Examples:        req.Examples,
 		Constraints:     req.Constraints,
 		SampleTestCases: req.SampleTestCases,
@@ -92,6 +96,7 @@ func (pc *ProblemController) BulkCreateProblems(c *gin.Context) {
 			Topics:          req.Problems[i].Topics,
 			Hint:            req.Problems[i].Hint,
 			Details:         req.Problems[i].Details,
+			Editorial:       req.Problems[i].Editorial,
 			Examples:        req.Problems[i].Examples,
 			Constraints:     req.Problems[i].Constraints,
 			SampleTestCases: req.Problems[i].SampleTestCases,
@@ -113,7 +118,22 @@ func (pc *ProblemController) BulkCreateProblems(c *gin.Context) {
 }
 
 func (pc *ProblemController) ListProblems(c *gin.Context) {
-	resp, err := pc.svc.ListProblems()
+	filters := services.ProblemListFilters{
+		Difficulty: c.Query("difficulty"),
+		Status:     strings.ToLower(strings.TrimSpace(c.Query("status"))),
+	}
+	if topicStr := c.Query("topic"); topicStr != "" {
+		if id, err := strconv.ParseUint(topicStr, 10, 64); err == nil {
+			filters.TopicID = uint(id)
+		}
+	}
+	if userIDVal, ok := c.Get("userID"); ok {
+		if userID, ok := userIDVal.(uint); ok {
+			filters.UserID = userID
+		}
+	}
+
+	resp, err := pc.svc.ListProblems(filters)
 	if err != nil {
 		var appErr *utils.AppError
 		if errors.As(err, &appErr) {
@@ -134,7 +154,19 @@ func (pc *ProblemController) GetProblemBySlug(c *gin.Context) {
 		return
 	}
 
-	resp, err := pc.svc.GetProblemBySlug(slug)
+	viewer := services.UserViewer{}
+	if userIDVal, ok := c.Get("userID"); ok {
+		if userID, ok := userIDVal.(uint); ok {
+			viewer.UserID = userID
+		}
+	}
+	if roleVal, ok := c.Get("role"); ok {
+		if role, ok := roleVal.(string); ok {
+			viewer.Role = role
+		}
+	}
+
+	resp, err := pc.svc.GetProblemBySlug(slug, viewer)
 	if err != nil {
 		var appErr *utils.AppError
 		if errors.As(err, &appErr) {
@@ -190,6 +222,7 @@ func (pc *ProblemController) UpdateProblem(c *gin.Context) {
 		Topics:          req.Topics,
 		Hint:            req.Hint,
 		Details:         req.Details,
+		Editorial:       req.Editorial,
 		Examples:        req.Examples,
 		Constraints:     req.Constraints,
 		SampleTestCases: req.SampleTestCases,

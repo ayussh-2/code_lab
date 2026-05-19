@@ -5,6 +5,7 @@ import (
 
 	"github.com/ayussh-2/config"
 	"github.com/ayussh-2/internal/models"
+	"github.com/ayussh-2/internal/services"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -53,6 +54,15 @@ func NewPostgres(cfg *config.Config, log *zap.Logger) (*gorm.DB, error) {
 
 	if err := db.AutoMigrate(&models.SubmissionTestResult{}); err != nil {
 		return nil, err
+	}
+
+	if err := db.AutoMigrate(&models.RatingHistory{}); err != nil {
+		return nil, err
+	}
+
+	userSvc := services.NewUserService(log, db, cfg)
+	if err := userSvc.BackfillUsernames(); err != nil {
+		log.Warn("username backfill had errors", zap.Error(err))
 	}
 
 	log.Info("Connected to db and migrated!")
