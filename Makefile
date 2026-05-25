@@ -5,19 +5,18 @@ dev-frontend:
 dev-judge:
 	clear && cd backend && go run ./cmd/judge
 
-nats-image:
+nats-build:
 	docker build -t codelab/nats:latest -f Dockerfile.nats .
 
 nats-up:
 	docker run --name codelab-nats -d -p 4222:4222 -p 8222:8222 codelab/nats:latest
 
-nats-down:
-	docker rm -f codelab-nats
 
 sandbox-images:
 	docker build -t codelab/sandbox-python:latest -f backend/internal/sandbox/images/Dockerfile.python backend/internal/sandbox/images
 	docker build -t codelab/sandbox-node:latest   -f backend/internal/sandbox/images/Dockerfile.node   backend/internal/sandbox/images
 	docker build -t codelab/sandbox-cpp:latest    -f backend/internal/sandbox/images/Dockerfile.cplus  backend/internal/sandbox/images
+	docker build -t codelab/sandbox-java:latest    -f backend/internal/sandbox/images/Dockerfile.java  backend/internal/sandbox/images
 
 sandbox-smoke:
 	cd backend && go run ./cmd/sandbox-smoke

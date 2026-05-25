@@ -21,7 +21,6 @@ import (
 	"github.com/docker/docker/client"
 )
 
-
 type Runner struct {
 	cli         *client.Client
 	baseWorkDir string
@@ -88,7 +87,7 @@ func (r *Runner) Compile(ctx context.Context, lang, source string) (string, stri
 		return "", output, ErrCompileTimeout
 	}
 	if exitCode != 0 {
-		
+
 		return artifactDir, output, ErrCompileFailed
 	}
 	return artifactDir, output, nil
@@ -106,7 +105,6 @@ func (r *Runner) Run(ctx context.Context, lang, artifactID, stdin string, limits
 		return sandbox.RunResult{}, errors.New("artifactID is required")
 	}
 
-	
 	nano := int64(limits.CPUs) * 1_000_000_000
 	mount := bindWorkMount(artifactID, true)
 	hostCfg := newHostConfig(mount, limits.MemoryMB, limits.PidsLimit, nano, "16m", false)

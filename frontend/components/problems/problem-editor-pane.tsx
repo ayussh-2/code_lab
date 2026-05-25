@@ -1,25 +1,24 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+
 import dynamic from "next/dynamic";
-import { ApiError } from "@/lib/api";
+import Link from "next/link";
+
 import { useAuth } from "@/components/auth/auth-context";
 import { SignInRequired } from "@/components/auth/sign-in-required";
 import { LoadingState } from "@/components/ui/async-state";
-import type { ProblemDetail } from "@/lib/problems";
-import {
-    createSubmission,
-    type SubmissionKind,
-} from "@/lib/submissions";
 import { useSubmissionPoll } from "@/hooks/use-submission-poll";
-import { SubmissionResult } from "./submission-result";
+import { ApiError } from "@/lib/api";
+import type { ProblemDetail } from "@/lib/problems";
+import { createSubmission, type SubmissionKind } from "@/lib/submissions";
+
 import {
     DEFAULT_EDITOR_CODE,
     EDITOR_LANGUAGES,
-    isSubmissionSupported,
     type EditorLanguage,
 } from "./problem-shared";
+import { SubmissionResult } from "./submission-result";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
     ssr: false,
@@ -127,15 +126,6 @@ export function ProblemEditorPane({
             return;
         }
 
-        if (!isSubmissionSupported(selectedLanguage.id)) {
-            setSubmitError(
-                `${selectedLanguage.label} isn't supported by the judge yet. Try Python, JavaScript, or C++.`,
-            );
-            setBottomTab("result");
-            setIsBottomOpen(true);
-            return;
-        }
-
         setIsCreating(true);
         setBottomTab("result");
         setIsBottomOpen(true);
@@ -197,9 +187,7 @@ export function ProblemEditorPane({
 
                     {isLanguageMenuOpen && (
                         <div className="absolute left-0 top-full z-50 mt-1 w-44 overflow-hidden rounded-lg border border-white/8 bg-[#1e1e1e] py-1 shadow-xl">
-                            {EDITOR_LANGUAGES.filter((language) =>
-                                isSubmissionSupported(language.id),
-                            ).map((language) => (
+                            {EDITOR_LANGUAGES.map((language) => (
                                 <button
                                     key={language.id}
                                     onClick={() => selectLanguage(language)}
@@ -245,8 +233,7 @@ export function ProblemEditorPane({
                     theme="vs-dark"
                     options={{
                         fontSize: 13,
-                        fontFamily:
-                            "'JetBrains Mono', 'Fira Code', monospace",
+                        fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
                         fontLigatures: true,
                         minimap: { enabled: false },
                         scrollBeyondLastLine: false,
@@ -448,8 +435,9 @@ function IOHint() {
     return (
         <div className="mb-3 rounded border border-white/8 bg-[#1a1a1a] px-3 py-2 text-[11px] leading-5 text-zinc-400">
             <span className="font-semibold text-zinc-300">I/O format:</span>{" "}
-            your program reads from <span className="font-mono text-zinc-300">stdin</span>{" "}
-            and prints the answer to{" "}
+            your program reads from{" "}
+            <span className="font-mono text-zinc-300">stdin</span> and prints
+            the answer to{" "}
             <span className="font-mono text-zinc-300">stdout</span>. Match the
             exact format shown in the sample input below.
         </div>

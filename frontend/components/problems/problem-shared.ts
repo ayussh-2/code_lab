@@ -36,31 +36,11 @@ export const PROBLEM_DETAIL_TABS = [
 export const EDITOR_LANGUAGES = [
     { label: "Python3", id: "python" },
     { label: "JavaScript", id: "javascript" },
-    { label: "TypeScript", id: "typescript" },
     { label: "C++", id: "cpp" },
-    { label: "C", id: "c" },
     { label: "Java", id: "java" },
-    { label: "Go", id: "go" },
-    { label: "Rust", id: "rust" },
-    { label: "C#", id: "csharp" },
-    { label: "Swift", id: "swift" },
-    { label: "Kotlin", id: "kotlin" },
-    { label: "Ruby", id: "ruby" },
 ] as const;
 
 export type EditorLanguage = (typeof EDITOR_LANGUAGES)[number];
-
-// SUBMISSION_SUPPORTED_LANGUAGES must stay in sync with the backend's
-// docker.Languages map (backend/internal/sandbox/docker/languages.go).
-export const SUBMISSION_SUPPORTED_LANGUAGES = new Set<EditorLanguage["id"]>([
-    "python",
-    "javascript",
-    "cpp",
-]);
-
-export function isSubmissionSupported(id: EditorLanguage["id"]): boolean {
-    return SUBMISSION_SUPPORTED_LANGUAGES.has(id);
-}
 
 export const DEFAULT_EDITOR_CODE: Record<string, string> = {
     python: [
@@ -98,11 +78,9 @@ export const DEFAULT_EDITOR_CODE: Record<string, string> = {
     ].join("\n"),
     typescript: "function solve(): void {\n    \n};\n",
     c: "#include <stdio.h>\n\nint main() {\n    // TODO: read from stdin, print to stdout\n    return 0;\n}\n",
-    java: "class Solution {\n    public void solve() {\n        \n    }\n}\n",
-    go: "package main\n\nfunc solve() {\n    \n}\n",
-    rust: "impl Solution {\n    pub fn solve() {\n        \n    }\n}\n",
-    csharp: "public class Solution {\n    public void Solve() {\n        \n    }\n}\n",
-    swift: "class Solution {\n    func solve() {\n        \n    }\n}\n",
-    kotlin: "class Solution {\n    fun solve() {\n        \n    }\n}\n",
-    ruby: "def solve\n    \nend\n",
+    java: `class Main {
+    public static void main() {
+        System.out.println("hello world!");
+    }
+    }`,
 };
