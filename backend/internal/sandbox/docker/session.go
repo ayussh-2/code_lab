@@ -1,5 +1,3 @@
-// the generic "create a container, run it, capture output, kill
-
 package docker
 
 import (
@@ -15,8 +13,6 @@ import (
 	"github.com/docker/docker/pkg/stdcopy"
 )
 
-// truncateString cuts a string off after max bytes. We use it on stdout/stderr
-// so a runaway `while True: print(...)` doesn't fill up our DB.
 func truncateString(s string, max int) string {
 	if max <= 0 || len(s) <= max {
 		return s
@@ -24,20 +20,7 @@ func truncateString(s string, max int) string {
 	return s[:max] + "\n... [truncated]"
 }
 
-// containerRunAndWait is the workhorse. It:
-//
-//  1. Creates the container with the given config.
-//  2. Attaches to it so we can stream stdin in and pull stdout/stderr out.
-//  3. Starts the container.
-//  4. If we have stdin, spawns a goroutine that writes it then closes the pipe.
-//  5. Spawns another goroutine that reads stdout+stderr until EOF using stdcopy
-//  6. Races a timer against the read finishing. If the timer wins, we SIGKILL
-//     and still wait for the reader so we don't leak output.
-//  7. Inspects the container to grab the exit code and the OOMKilled flag.
-//  8. Returns everything. The defer removes the container so it doesn't pile up.
-//
-// We use context.Background() for cleanup paths on purpose: even if the caller's  context got cancelled, we still want to kill/remove the container.
-
+// starts and gives ip captures op and finally returns the results
 func containerRunAndWait(
 	ctx context.Context,
 	cli *client.Client,
@@ -68,6 +51,7 @@ func containerRunAndWait(
 
 	start := time.Now()
 
+	// pass in input vals
 	if attachOpts.Stdin {
 		go func() {
 			if stdinPayload != "" {
@@ -77,6 +61,7 @@ func containerRunAndWait(
 		}()
 	}
 
+	// read stdoutput
 	var stdoutBuf, stderrBuf bytes.Buffer
 	readDone := make(chan struct{})
 	go func() {
@@ -87,11 +72,12 @@ func containerRunAndWait(
 	timer := time.NewTimer(time.Duration(timeoutMs) * time.Millisecond)
 	defer timer.Stop()
 
+	// resovling go routine
 	select {
+	// program exited without issues
 	case <-readDone:
-		// program finished on its own, good case.
+		// tle
 	case <-timer.C:
-		// hit the wall clock timeout — TLE in judge terms.
 		timedOut = true
 		_ = cli.ContainerKill(context.Background(), cid, "SIGKILL")
 		<-readDone

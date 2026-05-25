@@ -1,14 +1,3 @@
-// Package docker is the docker-backed implementation of sandbox.Runner.
-//
-// Lifecycle of a submission:
-//  1. Compile(lang, source)   -> creates host workspace, builds binary if needed.
-//  2. Run(lang, artifact, ..) -> one call per test case, returns RunResult.
-//  3. Cleanup(artifact)       -> deletes the host workspace. Always in defer.
-//
-// The host workspace is just a temp folder. Its path doubles as the "artifactID"
-// we hand back to the caller, so the caller dosen't need to know how we store
-// things.
-
 package docker
 
 import (
@@ -26,8 +15,6 @@ type Runner struct {
 	baseWorkDir string
 }
 
-// NewRunner wires up a Runner with a docker client and a base directory under
-// which every submission gets its own subfolder (eg /tmp/codelab-sandbox/sub-*).
 func NewRunner(cli *client.Client, baseWorkDir string) *Runner {
 	return &Runner{cli: cli, baseWorkDir: baseWorkDir}
 }
@@ -36,22 +23,8 @@ func NewDefaultClient() (*client.Client, error) {
 	return client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 }
 
-// Compile time check that Runner satisfies the sandbox.Runner interface. If
-// you change the interface and forget to update this struct the build breaks
-// here, not somewhere deep in the judge service.
 var _ sandbox.Runner = (*Runner)(nil)
 
-// Compile prepares everything we need to run user code. For interpreted
-// languages this just writes the source file into a workspace. For compiled
-// langs it ALSO spins up a one-shot container that runs the compiler.
-//
-// Returns the artifact dir path, the compiler output (if any), and an error.
-// Three failure modes worth distinguishing:
-//   - err == ErrCompileFailed: compiler ran fine but exited non-zero. The
-//     `output` string is the compiler stderr, which we want to show the user
-//     as a "Compilation Error" verdict.
-//   - err == ErrCompileTimeout: compile took longer than the compile timeout.
-//   - any other err: infra problem, fail the submission with "Internal Error".
 func (r *Runner) Compile(ctx context.Context, lang, source string) (string, string, error) {
 	spec, ok := Languages[lang]
 	if !ok {
@@ -64,7 +37,6 @@ func (r *Runner) Compile(ctx context.Context, lang, source string) (string, stri
 	}
 
 	if !spec.NeedsCompile {
-		// Interpreted lang, nothing else to do. The source is already in /work.
 		return artifactDir, "", nil
 	}
 
@@ -93,9 +65,6 @@ func (r *Runner) Compile(ctx context.Context, lang, source string) (string, stri
 	return artifactDir, output, nil
 }
 
-// Run executes the artifact once with the given stdin, capped by limits.
-// One test case = one Run call. The workspace is mounted READ-ONLY here so a
-// program can't tamper with its own binary or source for the next test.
 func (r *Runner) Run(ctx context.Context, lang, artifactID, stdin string, limits sandbox.Limits) (sandbox.RunResult, error) {
 	spec, ok := Languages[lang]
 	if !ok {
@@ -144,7 +113,6 @@ func (r *Runner) Run(ctx context.Context, lang, artifactID, stdin string, limits
 	}, nil
 }
 
-// Cleanup removes the per-submission workspace from the host.
 func (r *Runner) Cleanup(artifactID string) error {
 	if artifactID == "" {
 		return nil

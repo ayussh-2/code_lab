@@ -18,8 +18,6 @@ sandbox-images:
 	docker build -t codelab/sandbox-cpp:latest    -f backend/internal/sandbox/images/Dockerfile.cplus  backend/internal/sandbox/images
 	docker build -t codelab/sandbox-java:latest    -f backend/internal/sandbox/images/Dockerfile.java  backend/internal/sandbox/images
 
-sandbox-smoke:
-	cd backend && go run ./cmd/sandbox-smoke
 
 seed:
 	cd backend && go run ./cmd/seed
