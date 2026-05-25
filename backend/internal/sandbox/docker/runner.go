@@ -96,7 +96,7 @@ func (r *Runner) Run(ctx context.Context, lang, artifactID, stdin string, limits
 		Stream: true, Stdin: true, Stdout: true, Stderr: true,
 	}
 
-	stdout, stderr, exitCode, oom, timedOut, elapsed, err := containerRunAndWait(
+	stdout, stderr, exitCode, oom, timedOut, elapsed, memoryKB, err := containerRunAndWait(
 		ctx, r.cli, cfg, hostCfg, attachOpts, stdin, limits.RunTimeoutMs,
 	)
 	if err != nil {
@@ -108,6 +108,7 @@ func (r *Runner) Run(ctx context.Context, lang, artifactID, stdin string, limits
 		Stderr:     truncateString(stderr, limits.StderrMaxBytes),
 		ExitCode:   exitCode,
 		DurationMs: int(elapsed.Milliseconds()),
+		MemoryKB:   memoryKB,
 		TimedOut:   timedOut,
 		OOM:        oom,
 	}, nil

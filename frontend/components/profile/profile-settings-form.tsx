@@ -1,9 +1,11 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+
 import { useRouter } from "next/navigation";
-import type { User } from "@/lib/auth";
+
 import { ApiError } from "@/lib/api";
+import type { User } from "@/lib/auth";
 import { updateOwnProfile } from "@/lib/profile";
 
 interface ProfileSettingsFormProps {
@@ -11,7 +13,10 @@ interface ProfileSettingsFormProps {
     onSaved: (user: User) => void;
 }
 
-export function ProfileSettingsForm({ user, onSaved }: ProfileSettingsFormProps) {
+export function ProfileSettingsForm({
+    user,
+    onSaved,
+}: ProfileSettingsFormProps) {
     const router = useRouter();
     const [name, setName] = useState(user.name ?? "");
     const [username, setUsername] = useState(user.username ?? "");
@@ -39,7 +44,6 @@ export function ProfileSettingsForm({ user, onSaved }: ProfileSettingsFormProps)
                 username: result.data.username,
                 avatar_url: result.data.avatar_url,
                 bio: result.data.bio,
-                rating: result.data.rating,
             };
             onSaved(updated);
             setSaveMessage("Profile saved.");

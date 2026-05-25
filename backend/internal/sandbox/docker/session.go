@@ -3,6 +3,7 @@ package docker
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"time"
@@ -29,10 +30,10 @@ func containerRunAndWait(
 	attachOpts container.AttachOptions,
 	stdinPayload string,
 	timeoutMs int,
-) (stdout, stderr string, exitCode int, oom bool, timedOut bool, elapsed time.Duration, err error) {
+) (stdout, stderr string, exitCode int, oom bool, timedOut bool, elapsed time.Duration, memoryKB int, err error) {
 	created, err := cli.ContainerCreate(ctx, cfg, hostCfg, &network.NetworkingConfig{}, nil, "")
 	if err != nil {
-		return "", "", 0, false, false, 0, fmt.Errorf("container create: %w", err)
+		return "", "", 0, false, false, 0, 0, fmt.Errorf("container create: %w", err)
 	}
 	cid := created.ID
 	defer func() {
@@ -41,15 +42,64 @@ func containerRunAndWait(
 
 	attach, err := cli.ContainerAttach(ctx, cid, attachOpts)
 	if err != nil {
-		return "", "", 0, false, false, 0, fmt.Errorf("container attach: %w", err)
+		return "", "", 0, false, false, 0, 0, fmt.Errorf("container attach: %w", err)
 	}
 	defer attach.Close()
 
 	if err := cli.ContainerStart(ctx, cid, container.StartOptions{}); err != nil {
-		return "", "", 0, false, false, 0, fmt.Errorf("container start: %w", err)
+		return "", "", 0, false, false, 0, 0, fmt.Errorf("container start: %w", err)
 	}
 
 	start := time.Now()
+
+	// Monitor memory usage via streaming stats
+	maxMemoryKB := 0
+	memStopChan := make(chan struct{})
+	memUpdatedChan := make(chan struct{})
+	go func() {
+		defer func() { _ = recover() }() // Prevent panic if channel closed
+
+		statsCtx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond+5*time.Second)
+		defer cancel()
+
+		statsChan, err := cli.ContainerStats(statsCtx, cid, true)
+		if err != nil {
+			return
+		}
+		defer statsChan.Body.Close()
+
+		decoder := json.NewDecoder(statsChan.Body)
+		firstRead := true
+		for {
+			select {
+			case <-memStopChan:
+				return
+			default:
+				var stats struct {
+					MemoryStats struct {
+						Usage int64 `json:"usage"`
+					} `json:"memory_stats"`
+				}
+				if err := decoder.Decode(&stats); err != nil {
+					return
+				}
+				memKB := int(stats.MemoryStats.Usage / 1024)
+				if memKB > maxMemoryKB {
+					maxMemoryKB = memKB
+				}
+				if firstRead {
+					firstRead = false
+					close(memUpdatedChan)
+				}
+			}
+		}
+	}()
+
+	// Wait for first memory stat to be read (with timeout)
+	select {
+	case <-memUpdatedChan:
+	case <-time.After(100 * time.Millisecond):
+	}
 
 	// pass in input vals
 	if attachOpts.Stdin {
@@ -85,8 +135,11 @@ func containerRunAndWait(
 		// caller cancelled (server shutting down, request cancelled, etc).
 		_ = cli.ContainerKill(context.Background(), cid, "SIGKILL")
 		<-readDone
-		return "", "", 0, false, false, 0, ctx.Err()
+		return "", "", 0, false, false, 0, 0, ctx.Err()
 	}
+
+	// Stop memory monitoring
+	close(memStopChan)
 
 	elapsed = time.Since(start)
 
@@ -100,5 +153,5 @@ func containerRunAndWait(
 		oom = inspect.State.OOMKilled
 	}
 
-	return stdoutBuf.String(), stderrBuf.String(), exitCode, oom, timedOut, elapsed, nil
+	return stdoutBuf.String(), stderrBuf.String(), exitCode, oom, timedOut, elapsed, maxMemoryKB, nil
 }

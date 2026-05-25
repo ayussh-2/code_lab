@@ -42,7 +42,7 @@ func (r *Runner) runOneShot(ctx context.Context, in oneShotInput) (output string
 		Stream: true, Stdout: true, Stderr: true,
 	}
 
-	stdout, stderr, exitCode, _, timedOut, _, err := containerRunAndWait(
+	stdout, stderr, exitCode, _, timedOut, _, _, err := containerRunAndWait(
 		ctx, r.cli, cfg, hostCfg, attachOpts, "", in.timeoutMs,
 	)
 	if err != nil {

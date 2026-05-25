@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+
 import { useParams } from "next/navigation";
-import { ApiError } from "@/lib/api";
-import { type ProblemDetail, getProblemBySlug } from "@/lib/problems";
+
 import { ProblemDescriptionPane } from "@/components/problems/problem-description-pane";
 import { ProblemEditorPane } from "@/components/problems/problem-editor-pane";
 import { PROBLEM_DETAIL_TABS } from "@/components/problems/problem-shared";
+import { ApiError } from "@/lib/api";
+import { getProblemBySlug, type ProblemDetail } from "@/lib/problems";
 
 type ProblemTab = (typeof PROBLEM_DETAIL_TABS)[number];
 
@@ -37,7 +39,7 @@ export default function SolveProblemPage() {
 
     return (
         <div className="flex h-screen flex-col overflow-hidden bg-[#0e0e0e] text-zinc-300">
-            <main className="flex flex-1 gap-3 overflow-hidden p-3 lg:flex-row">
+            <main className="flex flex-col md:flex-1 gap-3 overflow-hidden p-3 lg:flex-row">
                 <ProblemDescriptionPane
                     problem={problem}
                     isLoading={isLoading}

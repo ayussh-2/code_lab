@@ -1,16 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ApiError } from "@/lib/api";
+
 import { useAuth } from "@/components/auth/auth-context";
 import { SignInRequired } from "@/components/auth/sign-in-required";
+import { ErrorState, LoadingState } from "@/components/ui/async-state";
+import { ApiError } from "@/lib/api";
 import {
     listSubmissions,
     type Submission,
     VERDICT_BADGE_CLASS,
     VERDICT_LABEL,
 } from "@/lib/submissions";
-import { ErrorState, LoadingState } from "@/components/ui/async-state";
+
 import { EDITOR_LANGUAGES } from "./problem-shared";
 import { SubmissionResult } from "./submission-result";
 
@@ -45,9 +47,7 @@ export function SubmissionsListPane({ slug }: SubmissionsListPaneProps) {
                 setSubmissions(result.data);
                 setErrorMessage("");
                 setIsUnauthorized(false);
-                const hasPending = result.data.some(
-                    (s) => s.status !== "done",
-                );
+                const hasPending = result.data.some((s) => s.status !== "done");
                 if (hasPending) {
                     timer = setTimeout(load, POLL_INTERVAL_MS);
                 }
@@ -152,7 +152,7 @@ function SubmissionRow({ submission, expanded, onToggle }: SubmissionRowProps) {
                 </span>
                 <span className="font-mono text-[11px] text-zinc-400">
                     {isTerminal && submission.memory_kb > 0
-                        ? `${submission.memory_kb} KB`
+                        ? formatMemory(submission.memory_kb)
                         : "—"}
                 </span>
                 <span className="text-right font-mono text-[11px] text-zinc-500">
@@ -193,6 +193,14 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
 function formatLanguage(id: string): string {
     const match = EDITOR_LANGUAGES.find((l) => l.id === id);
     return match ? match.label : id;
+}
+
+function formatMemory(memoryKB: number): string {
+    if (memoryKB <= 0) return "—";
+    if (memoryKB > 1000) {
+        return `${(memoryKB / 1024).toFixed(2)} MB`;
+    }
+    return `${memoryKB} KB`;
 }
 
 function formatRelative(iso: string): string {

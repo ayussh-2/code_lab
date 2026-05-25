@@ -3,7 +3,6 @@ package judge
 import (
 	"fmt"
 
-	"github.com/docker/docker/client"
 	"github.com/ayussh-2/config"
 	"github.com/ayussh-2/internal/database"
 	"github.com/ayussh-2/internal/logger"
@@ -11,6 +10,7 @@ import (
 	"github.com/ayussh-2/internal/queue"
 	"github.com/ayussh-2/internal/sandbox/docker"
 	"github.com/ayussh-2/internal/services"
+	"github.com/docker/docker/client"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
