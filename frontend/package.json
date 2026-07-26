@@ -12,7 +12,6 @@
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
     "@uiw/react-md-editor": "^4.1.0",
-    "@webcontainer/api": "^1.6.4",
     "katex": "^0.16.45",
     "next": "16.2.6",
     "react": "19.2.4",

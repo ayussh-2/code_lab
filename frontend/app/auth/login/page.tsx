@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { AuthPageContainer } from "@/components/auth/auth-page-container";
 import { LoginForm } from "./login-form";
@@ -12,7 +13,9 @@ export default function LoginPage() {
         footerLinkText="Sign up"
         footerLinkHref="/auth/signup"
       >
-        <LoginForm />
+        <Suspense fallback={null}>
+          <LoginForm />
+        </Suspense>
       </AuthShell>
     </AuthPageContainer>
   );

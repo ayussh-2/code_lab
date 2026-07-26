@@ -18,6 +18,8 @@ export const FRONTEND_QUESTIONS: ProblemDetail[] = [
         examples: [],
         constraints: [],
         sample_test_cases: [],
+        acceptance_rate: 100,
+        editorial_unlocked: true,
     },
 ];
 
@@ -29,12 +31,13 @@ export function getFrontendQuestionBySlug(
 
 export function frontendQuestionsAsListItems(): ProblemListItem[] {
     return FRONTEND_QUESTIONS.map(
-        ({ id, title, slug, difficulty, topics }) => ({
+        ({ id, title, slug, difficulty, topics, acceptance_rate }) => ({
             id,
             title,
             slug,
             difficulty,
             topics,
+            acceptance_rate,
         }),
     );
 }

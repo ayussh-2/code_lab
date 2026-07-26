@@ -1,4 +1,9 @@
-import type { FileSystemTree } from "@webcontainer/api";
+export interface FileSystemTree {
+    [key: string]: {
+        file?: { contents: string };
+        directory?: { [key: string]: any };
+    };
+}
 
 export const FRONTEND_QUESTION_PROJECT: FileSystemTree = {
     "package.json": {
