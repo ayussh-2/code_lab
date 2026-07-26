@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  nats:
+    image: nats:2.10-alpine
+    container_name: codelab-nats
+    restart: always
+    command: ["-js", "-m", "8222"]
+    ports:
+      - "127.0.0.1:4222:4222"
+      - "127.0.0.1:8222:8222"
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: codelab-api
+    restart: always
+    command: ["/app/api-server"]
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      - nats
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/codelab-sandbox:/tmp/codelab-sandbox
+    env_file:
+      - ./backend/.env.production
+
+  judge-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: codelab-judge
+    restart: always
+    command: ["/app/judge-worker"]
+    depends_on:
+      - nats
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /tmp/codelab-sandbox:/tmp/codelab-sandbox
+    env_file:
+      - ./backend/.env.production
