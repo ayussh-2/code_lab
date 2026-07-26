@@ -15,7 +15,7 @@ import (
 func main() {
 	cfg := config.LoadConfig()
 	if cfg.Env == "production" {
-		gin.SetMode("production")
+		gin.SetMode("release")
 	}
 
 	log, err := logger.Init(cfg.Env)
