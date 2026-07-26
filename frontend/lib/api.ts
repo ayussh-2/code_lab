@@ -15,7 +15,7 @@ export class ApiError extends Error {
     this.details = details ?? null;
   }
 }
-
+// update
 export const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api";
 
