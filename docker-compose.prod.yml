@@ -11,9 +11,7 @@ services:
       - "127.0.0.1:8222:8222"
 
   api:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ayush91101/codelab-backend:latest
     container_name: codelab-api
     restart: always
     command: ["/app/api-server"]
@@ -28,9 +26,7 @@ services:
       - ./backend/.env.production
 
   judge-worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ayush91101/codelab-backend:latest
     container_name: codelab-judge
     restart: always
     command: ["/app/judge-worker"]

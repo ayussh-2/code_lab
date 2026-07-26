@@ -17,7 +17,7 @@ export class ApiError extends Error {
 }
 // update
 export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api";
+  process.env.NEXT_PUBLIC_API_BASE_URL ?? "https://codelab-api.ayussh.me/api";
 
 interface ApiRequestOptions extends Omit<RequestInit, "body"> {
   body?: unknown;
