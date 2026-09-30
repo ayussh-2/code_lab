@@ -1,5 +1,5 @@
 import { FileSystemTree, WebContainer } from "@webcontainer/api";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 
 export interface wcInterface {
   files: FileSystemTree;
@@ -7,6 +7,22 @@ export interface wcInterface {
 }
 
 let webContainerPromise: Promise<WebContainer> | null = null;
+
+function cleanTerminalOutput(data: string) {
+  const withoutSpinner = data.replace(
+    /(?:\u001b\[[0-9;?]*G\u001b\[[0-9;?]*K[\\|/-])+/g,
+    "",
+  );
+  const withoutAnsi = withoutSpinner
+    .replace(/\u001b\][\s\S]*?(?:\u0007|\u001b\\)/g, "")
+    .replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "");
+
+  return withoutAnsi
+    .replace(/\r/g, "")
+    .split("\n")
+    .filter((line) => !/^[\\|/-]$/.test(line.trim()))
+    .join("\n");
+}
 
 function getWebContainer() {
   if (!webContainerPromise) {
@@ -20,6 +36,62 @@ export function useWebContainer({ files, iframeRef }: wcInterface) {
   const [wcInstance, setWcInstance] = useState<WebContainer | null>(null);
   const [status, setStatus] = useState("booting");
   const [error, setError] = useState<string | null>(null);
+  const [terminalOutput, setTerminalOutput] = useState("");
+  const [isCommandRunning, setIsCommandRunning] = useState(false);
+
+  const appendTerminalOutput = useCallback((data: string) => {
+    const cleaned = cleanTerminalOutput(data);
+    if (!cleaned) return;
+    setTerminalOutput((current) => `${current}${cleaned}`.slice(-100_000));
+  }, []);
+
+  const streamProcess = useCallback(
+    async function streamProcess(
+      process: Awaited<ReturnType<WebContainer["spawn"]>>,
+      command: string,
+    ) {
+      appendTerminalOutput(`\n$ ${command}\n`);
+      void process.output
+        .pipeTo(
+          new WritableStream({
+            write(data) {
+              appendTerminalOutput(data);
+            },
+          }),
+        )
+        .catch((streamError) => {
+          appendTerminalOutput(
+            `\nOutput stream error: ${streamError instanceof Error ? streamError.message : String(streamError)}\n`,
+          );
+        });
+
+      const exitCode = await process.exit;
+      appendTerminalOutput(`\n[process exited with code ${exitCode}]\n`);
+      return exitCode;
+    },
+    [appendTerminalOutput],
+  );
+
+  const runCommand = useCallback(
+    async (commandLine: string) => {
+      const webcontainerInstance = await getWebContainer();
+      const [command, ...args] = commandLine.trim().split(/\s+/);
+      if (!command) return;
+
+      setIsCommandRunning(true);
+      try {
+        const process = await webcontainerInstance.spawn(command, args);
+        await streamProcess(process, commandLine.trim());
+      } catch (commandError) {
+        appendTerminalOutput(
+          `\nCommand error: ${commandError instanceof Error ? commandError.message : String(commandError)}\n`,
+        );
+      } finally {
+        setIsCommandRunning(false);
+      }
+    },
+    [appendTerminalOutput, streamProcess],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -39,8 +111,10 @@ export function useWebContainer({ files, iframeRef }: wcInterface) {
         const installProcess = await webcontainerInstance.spawn("npm", [
           "install",
         ]);
-
-        const installExitCode = await installProcess.exit;
+        const installExitCode = await streamProcess(
+          installProcess,
+          "npm install",
+        );
 
         if (installExitCode !== 0) {
           throw new Error("Unable to run npm install");
@@ -58,7 +132,24 @@ export function useWebContainer({ files, iframeRef }: wcInterface) {
           setStatus("ready");
         });
 
-        await webcontainerInstance.spawn("npm", ["run", "dev"]);
+        const devProcess = await webcontainerInstance.spawn("npm", [
+          "run",
+          "dev",
+        ]);
+        appendTerminalOutput("\n$ npm run dev\n");
+        void devProcess.output
+          .pipeTo(
+            new WritableStream({
+              write(data) {
+                appendTerminalOutput(data);
+              },
+            }),
+          )
+          .catch((streamError) => {
+            appendTerminalOutput(
+              `\nDev server output error: ${streamError instanceof Error ? streamError.message : String(streamError)}\n`,
+            );
+          });
       } catch (e) {
         console.error("WebContainer error:", e);
 
@@ -76,11 +167,14 @@ export function useWebContainer({ files, iframeRef }: wcInterface) {
     return () => {
       cancelled = true;
     };
-  }, [files, iframeRef]);
+  }, [appendTerminalOutput, files, iframeRef, streamProcess]);
 
   return {
     wcInstance,
     status,
     error,
+    terminalOutput,
+    isCommandRunning,
+    runCommand,
   };
 }

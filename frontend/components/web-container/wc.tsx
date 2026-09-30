@@ -6,6 +6,7 @@ import { PanelTabs } from "./panel-tabs";
 import { PreviewPanel } from "./preview-panel";
 import { QuestionPanel } from "./question-panel";
 import { ResizeHandle } from "./resize-handle";
+import { TerminalPanel } from "./terminal-panel";
 import type { ActivePanel, WebContProps } from "./types";
 import { useWebContainer } from "@/hooks/use-webcontainer";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -18,7 +19,10 @@ export default function WebCont({ files, question }: WebContProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const tree = useMemo(() => createTreeElements(files), [files]);
-  const { status, error } = useWebContainer({ files, iframeRef });
+  const { status, error, terminalOutput } = useWebContainer({
+    files,
+    iframeRef,
+  });
 
   useEffect(() => {
     if (!isResizing) return;
@@ -54,6 +58,8 @@ export default function WebCont({ files, question }: WebContProps) {
       setFilesPanelWidth((width) => Math.min(50, width + 2));
     }
   }
+
+  console.log(status);
 
   return (
     <div
@@ -106,6 +112,7 @@ export default function WebCont({ files, question }: WebContProps) {
       )}
 
       <PreviewPanel iframeRef={iframeRef} status={status} error={error} />
+      <TerminalPanel output={terminalOutput} />
     </div>
   );
 }
