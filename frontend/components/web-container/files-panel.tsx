@@ -41,8 +41,10 @@ export function createTreeElements(files: FileSystemTree) {
 
 export function FilesPanel({
   files,
+  onSelectFile,
 }: {
   files: ReturnType<typeof createTreeElements>;
+  onSelectFile: (path: string) => void;
 }) {
   return (
     <Tree
@@ -50,6 +52,7 @@ export function FilesPanel({
       initialSelectedId={files.firstFileId}
       initialExpandedItems={files.expandedItems}
       elements={files.elements}
+      onSelectChange={onSelectFile}
     />
   );
 }

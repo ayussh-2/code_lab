@@ -117,7 +117,8 @@ const sortTreeElements = (
 
 const renderTreeElements = (
   elements: TreeViewElement[],
-  sort: TreeSortMode
+  sort: TreeSortMode,
+  onSelectChange?: (id: string) => void,
 ): React.ReactNode =>
   sortTreeElements(elements, sort).map((element) => {
     if (isFolderElement(element)) {
@@ -129,7 +130,7 @@ const renderTreeElements = (
           isSelectable={element.isSelectable}
         >
           {Array.isArray(element.children)
-            ? renderTreeElements(element.children, sort)
+            ? renderTreeElements(element.children, sort, onSelectChange)
             : null}
         </Folder>
       )
@@ -140,6 +141,7 @@ const renderTreeElements = (
         key={element.id}
         value={element.id}
         isSelectable={element.isSelectable}
+        handleSelect={onSelectChange}
       >
         <span>{element.name}</span>
       </File>
@@ -154,6 +156,7 @@ type TreeViewProps = {
   openIcon?: React.ReactNode
   closeIcon?: React.ReactNode
   sort?: TreeSortMode
+  onSelectChange?: (id: string) => void
 } & Omit<
   React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Root>,
   "defaultValue" | "onValueChange" | "type" | "value"
@@ -171,6 +174,7 @@ const Tree = forwardRef<HTMLDivElement, TreeViewProps>(
       openIcon,
       closeIcon,
       sort = "default",
+      onSelectChange,
       dir,
       ...props
     },
@@ -240,7 +244,8 @@ const Tree = forwardRef<HTMLDivElement, TreeViewProps>(
 
     const direction = dir === "rtl" ? "rtl" : "ltr"
     const treeChildren =
-      children ?? (elements ? renderTreeElements(elements, sort) : null)
+      children ??
+      (elements ? renderTreeElements(elements, sort, onSelectChange) : null)
 
     return (
       <TreeContext.Provider

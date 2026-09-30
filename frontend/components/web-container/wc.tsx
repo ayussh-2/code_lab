@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "../ui/button";
+import { CodeEditorPanel } from "./code-editor-panel";
 import { FilesPanel, createTreeElements } from "./files-panel";
 import { PanelTabs } from "./panel-tabs";
 import { PreviewPanel } from "./preview-panel";
@@ -14,12 +15,23 @@ import { useEffect, useMemo, useRef, useState } from "react";
 export default function WebCont({ files, question }: WebContProps) {
   const [filesPanelWidth, setFilesPanelWidth] = useState(28);
   const [isResizing, setIsResizing] = useState(false);
+  const [previewPanelWidth, setPreviewPanelWidth] = useState(38);
+  const [isResizingPreview, setIsResizingPreview] = useState(false);
   const [activePanel, setActivePanel] = useState<ActivePanel>("question");
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const tree = useMemo(() => createTreeElements(files), [files]);
-  const { status, error, terminalOutput } = useWebContainer({
+  const [selectedFile, setSelectedFile] = useState<string | undefined>(
+    tree.firstFileId,
+  );
+  const {
+    status,
+    error,
+    terminalOutput,
+    readFile,
+    writeFile,
+  } = useWebContainer({
     files,
     iframeRef,
   });
@@ -48,6 +60,30 @@ export default function WebCont({ files, question }: WebContProps) {
     };
   }, [isResizing]);
 
+  useEffect(() => {
+    if (!isResizingPreview) return;
+
+    function handlePointerMove(event: PointerEvent) {
+      const workspace = workspaceRef.current;
+      if (!workspace) return;
+
+      const { right, width } = workspace.getBoundingClientRect();
+      const nextWidth = ((right - event.clientX) / width) * 100;
+      setPreviewPanelWidth(Math.min(60, Math.max(25, nextWidth)));
+    }
+
+    function stopResizing() {
+      setIsResizingPreview(false);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopResizing);
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopResizing);
+    };
+  }, [isResizingPreview]);
+
   function handleResizeKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.key === "ArrowLeft") {
       event.preventDefault();
@@ -59,13 +95,26 @@ export default function WebCont({ files, question }: WebContProps) {
     }
   }
 
+  function handlePreviewResizeKeyDown(
+    event: React.KeyboardEvent<HTMLDivElement>,
+  ) {
+    if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      setPreviewPanelWidth((width) => Math.min(60, width + 2));
+    }
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      setPreviewPanelWidth((width) => Math.max(25, width - 2));
+    }
+  }
+
   console.log(status);
 
   return (
     <div
       ref={workspaceRef}
       className={`relative flex h-full min-h-0 w-full overflow-hidden bg-zinc-950 text-zinc-200 ${
-        isResizing ? "select-none" : ""
+        isResizing || isResizingPreview ? "select-none" : ""
       }`}
     >
       <aside
@@ -87,7 +136,10 @@ export default function WebCont({ files, question }: WebContProps) {
         {activePanel === "question" ? (
           <QuestionPanel question={question} />
         ) : (
-          <FilesPanel files={tree} />
+          <FilesPanel
+            files={tree}
+            onSelectFile={(path) => setSelectedFile(path)}
+          />
         )}
       </aside>
 
@@ -111,7 +163,25 @@ export default function WebCont({ files, question }: WebContProps) {
         </button>
       )}
 
-      <PreviewPanel iframeRef={iframeRef} status={status} error={error} />
+      <CodeEditorPanel
+        filePath={selectedFile}
+        readFile={readFile}
+        writeFile={writeFile}
+      />
+      <ResizeHandle
+        width={previewPanelWidth}
+        label="Resize preview panel"
+        minWidth={25}
+        maxWidth={60}
+        onKeyDown={handlePreviewResizeKeyDown}
+        onPointerDown={() => setIsResizingPreview(true)}
+      />
+      <div
+        className="flex h-full min-w-70"
+        style={{ width: `${previewPanelWidth}%` }}
+      >
+        <PreviewPanel iframeRef={iframeRef} status={status} error={error} />
+      </div>
       <TerminalPanel output={terminalOutput} />
     </div>
   );

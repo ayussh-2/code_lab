@@ -39,6 +39,16 @@ export function useWebContainer({ files, iframeRef }: wcInterface) {
   const [terminalOutput, setTerminalOutput] = useState("");
   const [isCommandRunning, setIsCommandRunning] = useState(false);
 
+  const readFile = useCallback(async (path: string) => {
+    const webcontainerInstance = await getWebContainer();
+    return webcontainerInstance.fs.readFile(path, "utf-8");
+  }, []);
+
+  const writeFile = useCallback(async (path: string, contents: string) => {
+    const webcontainerInstance = await getWebContainer();
+    await webcontainerInstance.fs.writeFile(path, contents);
+  }, []);
+
   const appendTerminalOutput = useCallback((data: string) => {
     const cleaned = cleanTerminalOutput(data);
     if (!cleaned) return;
@@ -176,5 +186,7 @@ export function useWebContainer({ files, iframeRef }: wcInterface) {
     terminalOutput,
     isCommandRunning,
     runCommand,
+    readFile,
+    writeFile,
   };
 }
