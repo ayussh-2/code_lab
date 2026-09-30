@@ -25,16 +25,11 @@ export default function WebCont({ files, question }: WebContProps) {
   const [selectedFile, setSelectedFile] = useState<string | undefined>(
     tree.firstFileId,
   );
-  const {
-    status,
-    error,
-    terminalOutput,
-    readFile,
-    writeFile,
-  } = useWebContainer({
-    files,
-    iframeRef,
-  });
+  const { status, error, terminalOutput, readFile, writeFile } =
+    useWebContainer({
+      files,
+      iframeRef,
+    });
 
   useEffect(() => {
     if (!isResizing) return;

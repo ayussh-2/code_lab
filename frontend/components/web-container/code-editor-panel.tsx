@@ -57,9 +57,9 @@ export function CodeEditorPanel({
 }: CodeEditorPanelProps) {
   const [contents, setContents] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">(
-    "idle",
-  );
+  const [saveState, setSaveState] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
 
   useEffect(() => {
     if (!filePath) return;
