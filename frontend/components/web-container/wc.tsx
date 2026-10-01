@@ -13,7 +13,7 @@ import { useWebContainer } from "@/hooks/use-webcontainer";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 export default function WebCont({ files, question }: WebContProps) {
-  const [filesPanelWidth, setFilesPanelWidth] = useState(28);
+  const [filesPanelWidth, setFilesPanelWidth] = useState(24);
   const [isResizing, setIsResizing] = useState(false);
   const [previewPanelWidth, setPreviewPanelWidth] = useState(38);
   const [isResizingPreview, setIsResizingPreview] = useState(false);
@@ -47,9 +47,13 @@ export default function WebCont({ files, question }: WebContProps) {
       setIsResizing(false);
     }
 
+    window.addEventListener("pointercancel", stopResizing);
+    window.addEventListener("blur", stopResizing);
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", stopResizing);
     return () => {
+      window.removeEventListener("pointercancel", stopResizing);
+      window.removeEventListener("blur", stopResizing);
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", stopResizing);
     };
@@ -71,9 +75,13 @@ export default function WebCont({ files, question }: WebContProps) {
       setIsResizingPreview(false);
     }
 
+    window.addEventListener("pointercancel", stopResizing);
+    window.addEventListener("blur", stopResizing);
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", stopResizing);
     return () => {
+      window.removeEventListener("pointercancel", stopResizing);
+      window.removeEventListener("blur", stopResizing);
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", stopResizing);
     };
@@ -102,8 +110,6 @@ export default function WebCont({ files, question }: WebContProps) {
       setPreviewPanelWidth((width) => Math.max(25, width - 2));
     }
   }
-
-  console.log(status);
 
   return (
     <div

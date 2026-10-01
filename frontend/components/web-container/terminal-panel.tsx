@@ -23,9 +23,13 @@ export function TerminalPanel({ output }: TerminalPanelProps) {
       setIsResizing(false);
     }
 
+    window.addEventListener("pointercancel", stopResizing);
+    window.addEventListener("blur", stopResizing);
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerup", stopResizing);
     return () => {
+      window.removeEventListener("pointercancel", stopResizing);
+      window.removeEventListener("blur", stopResizing);
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerup", stopResizing);
     };
@@ -78,6 +82,7 @@ export function TerminalPanel({ output }: TerminalPanelProps) {
           </div>
         </>
       )}
+
       {isCollapsed && (
         <button
           type="button"

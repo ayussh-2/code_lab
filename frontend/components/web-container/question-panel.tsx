@@ -5,9 +5,6 @@ export function QuestionPanel({ question }: { question: FrontendQuestion }) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto">
       <article className="px-5 py-6">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-blue-400">
-          Frontend challenge
-        </p>
         <MarkdownKatexView
           markdown={`# ${question.title}\n\n${question.description}`}
         />

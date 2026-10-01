@@ -6,22 +6,45 @@ export interface wcInterface {
   iframeRef: React.RefObject<HTMLIFrameElement | null>;
 }
 
+type WCProcess = Awaited<ReturnType<WebContainer["spawn"]>>;
+
 let webContainerPromise: Promise<WebContainer> | null = null;
 
-function cleanTerminalOutput(data: string) {
-  const withoutSpinner = data.replace(
-    /(?:\u001b\[[0-9;?]*G\u001b\[[0-9;?]*K[\\|/-])+/g,
-    "",
-  );
-  const withoutAnsi = withoutSpinner
-    .replace(/\u001b\][\s\S]*?(?:\u0007|\u001b\\)/g, "")
-    .replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "");
+const ESC = "(?:\\u001b|\\uFFFD)";
 
-  return withoutAnsi
-    .replace(/\r/g, "")
-    .split("\n")
-    .filter((line) => !/^[\\|/-]$/.test(line.trim()))
-    .join("\n");
+const SPINNER_RE = new RegExp(
+  `(?:${ESC}\\[[0-9;?]*G${ESC}\\[[0-9;?]*K[\\\\|/-]?)+`,
+  "g",
+);
+const OSC_RE = /\u001b\][\s\S]*?(?:\u0007|\u001b\\)/g;
+const CSI_RE = /\u001b\[[0-?]*[ -/]*[@-~]/g;
+
+const INCOMPLETE_TAIL_RE = /(?:\u001b|\uFFFD)(?:\[[0-?]*[ -/]*)?$/;
+
+export function createTerminalCleaner() {
+  let pending = "";
+
+  return function clean(chunk: string): string {
+    let data = pending + chunk;
+    pending = "";
+
+    const tail = data.match(INCOMPLETE_TAIL_RE);
+    if (tail) {
+      pending = tail[0];
+      data = data.slice(0, tail.index);
+    }
+
+    return data
+      .replace(SPINNER_RE, "")
+      .replace(OSC_RE, "")
+      .replace(CSI_RE, "")
+      .replace(/\r(?!\n)/g, "")
+      .replace(/\r\n/g, "\n")
+      .split("\n")
+      .filter((line) => !/^[\\|/-]$/.test(line.trim()))
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n");
+  };
 }
 
 function getWebContainer() {
@@ -49,37 +72,41 @@ export function useWebContainer({ files, iframeRef }: wcInterface) {
     await webcontainerInstance.fs.writeFile(path, contents);
   }, []);
 
-  const appendTerminalOutput = useCallback((data: string) => {
-    const cleaned = cleanTerminalOutput(data);
-    if (!cleaned) return;
-    setTerminalOutput((current) => `${current}${cleaned}`.slice(-100_000));
+  const appendTerminalOutput = useCallback((text: string) => {
+    if (!text) return;
+    setTerminalOutput((current) => `${current}${text}`.slice(-100_000));
   }, []);
 
-  const streamProcess = useCallback(
-    async function streamProcess(
-      process: Awaited<ReturnType<WebContainer["spawn"]>>,
-      command: string,
-    ) {
-      appendTerminalOutput(`\n$ ${command}\n`);
+  const pipeOutput = useCallback(
+    (process: WCProcess, label: string) => {
+      const clean = createTerminalCleaner();
       void process.output
         .pipeTo(
           new WritableStream({
             write(data) {
-              appendTerminalOutput(data);
+              appendTerminalOutput(clean(data));
             },
           }),
         )
         .catch((streamError) => {
           appendTerminalOutput(
-            `\nOutput stream error: ${streamError instanceof Error ? streamError.message : String(streamError)}\n`,
+            `\n${label} output error: ${streamError instanceof Error ? streamError.message : String(streamError)}\n`,
           );
         });
+    },
+    [appendTerminalOutput],
+  );
+
+  const streamProcess = useCallback(
+    async function streamProcess(process: WCProcess, command: string) {
+      appendTerminalOutput(`\n$ ${command}\n`);
+      pipeOutput(process, command);
 
       const exitCode = await process.exit;
       appendTerminalOutput(`\n[process exited with code ${exitCode}]\n`);
       return exitCode;
     },
-    [appendTerminalOutput],
+    [appendTerminalOutput, pipeOutput],
   );
 
   const runCommand = useCallback(
@@ -147,19 +174,7 @@ export function useWebContainer({ files, iframeRef }: wcInterface) {
           "dev",
         ]);
         appendTerminalOutput("\n$ npm run dev\n");
-        void devProcess.output
-          .pipeTo(
-            new WritableStream({
-              write(data) {
-                appendTerminalOutput(data);
-              },
-            }),
-          )
-          .catch((streamError) => {
-            appendTerminalOutput(
-              `\nDev server output error: ${streamError instanceof Error ? streamError.message : String(streamError)}\n`,
-            );
-          });
+        pipeOutput(devProcess, "Dev server");
       } catch (e) {
         console.error("WebContainer error:", e);
 
@@ -177,7 +192,7 @@ export function useWebContainer({ files, iframeRef }: wcInterface) {
     return () => {
       cancelled = true;
     };
-  }, [appendTerminalOutput, files, iframeRef, streamProcess]);
+  }, [appendTerminalOutput, files, iframeRef, streamProcess, pipeOutput]);
 
   return {
     wcInstance,
